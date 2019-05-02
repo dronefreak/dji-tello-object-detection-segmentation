@@ -30,8 +30,10 @@ Run Demonstration
 ```bash
 $ python3 telloCV-masked-rcnn.py
 ```
+Alternatively, you could download the weights file from [here](https://drive.google.com/file/d/1-18R4Nhsb_-iozR6UVE1J-OCUobDN4my/view?usp=sharing).
+
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=RMD8G3Na71s"><img src="1.jpg" alt="Mask RCNN COCO Object detection and segmentation
+  <a href="https://www.youtube.com/watch?v=RMD8G3Na71s"><img src="1.png" alt="Mask RCNN COCO Object detection and segmentation
 " width="550"></a>
 </div>
 
