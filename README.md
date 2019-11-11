@@ -15,9 +15,13 @@ This implementation would work better if you have a GPU in your system and use C
 Also, in order to test it on a Tello, make sure that you have the drone turned on and connected to its WiFi network. Once you esecute this code, press `TAB` to take-off and `BACKSPACE` to land. Other manual navigation commands are given in the header of the python code.
 
 ## Getting Started
+
+Make sure you have installed `TelloPy` from https://github.com/hanyazou/TelloPy.
+
 Install Dependencies (Not Mentioned Above)
 ```bash
 $ sudo -H pip3 install -r requirements.txt
+$ sudo -H pip3 install av opencv-python
 $ sudo -H pip3 install git+https://github.com/philferriere/cocoapi.git#subdirectory=PythonAPI
 ```
 
