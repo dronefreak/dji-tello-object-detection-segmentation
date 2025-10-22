@@ -1,0 +1,106 @@
+# Tello Vision Configuration
+# Supports multiple detection backends: detectron2, yolov8, or custom
+
+# Detection Backend Configuration
+detector:
+  backend: "yolov8" # Options: "detectron2", "yolov8", "custom"
+
+  # YOLOv8 Configuration (fast, real-time capable)
+  yolov8:
+    model: "yolov8n-seg.pt" # Options: yolov8n/s/m/l/x-seg.pt (nano to extra-large)
+    confidence: 0.5
+    iou_threshold: 0.45
+    device: "cuda" # "cuda" or "cpu"
+
+  # Detectron2 Configuration (higher quality, slower)
+  detectron2:
+    config_file: "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+    model_weights: "detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f10217.pkl"
+    confidence: 0.5
+    device: "cuda"
+    num_classes: 80 # COCO dataset
+
+  # Classes to detect (COCO format)
+  # Set to empty list to detect all classes
+  target_classes: [] # e.g., ["person", "car", "dog"]
+
+# DJI Tello Drone Configuration
+drone:
+  # Connection settings
+  host: "192.168.10.1"
+  port: 8889
+  vs_udp_port: 11111
+
+  # Flight parameters
+  speed: 50 # cm/s (10-100)
+  takeoff_height: 100 # cm
+
+  # Video settings
+  video_bitrate: 4 # Mbps (1-5)
+  fps: 30
+  resolution: [960, 720] # Tello default
+
+# Video Processing
+processing:
+  # Display settings
+  display_window: true
+  window_name: "Tello Vision"
+  display_fps: true
+  display_stats: true
+
+  # Performance optimization
+  frame_skip: 0 # Process every Nth frame (0 = process all)
+  async_inference: true # Run detection in separate thread
+  max_queue_size: 3 # Max frames in inference queue
+
+  # Recording
+  record_video: false
+  output_dir: "./output"
+  video_codec: "mp4v"
+
+# Visualization
+visualization:
+  # Bounding boxes
+  show_boxes: true
+  box_thickness: 2
+  box_color: "random" # "random" or [R, G, B]
+
+  # Masks
+  show_masks: true
+  mask_alpha: 0.4 # Transparency (0-1)
+
+  # Labels
+  show_labels: true
+  show_confidence: true
+  font_scale: 0.6
+  font_thickness: 2
+
+  # Colors per class (optional)
+  class_colors:
+    person: [255, 0, 0]
+    car: [0, 255, 0]
+    # Add more as needed
+
+# Keyboard Controls
+controls:
+  takeoff: "tab"
+  land: "backspace"
+  emergency: "esc"
+  forward: "w"
+  backward: "s"
+  left: "a"
+  right: "d"
+  up: "space"
+  down: "shift"
+  yaw_left: "q"
+  yaw_right: "e"
+  toggle_record: "r"
+  take_photo: "enter"
+  toggle_tracking: "t"
+  quit: "p"
+
+# Logging
+logging:
+  level: "INFO" # DEBUG, INFO, WARNING, ERROR
+  log_file: "./tello_vision.log"
+  log_to_console: true
