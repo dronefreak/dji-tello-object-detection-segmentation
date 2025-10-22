@@ -28,24 +28,31 @@ python -m tello_vision.app
 ## First Steps
 
 ### 1. Test Detection Without Drone
+
 Good for verifying everything works:
+
 ```bash
 python examples/test_detector.py --source 0  # Webcam
 ```
 
 ### 2. Benchmark Your Setup
+
 See what FPS you can get:
+
 ```bash
 python examples/benchmark.py
 ```
 
 ### 3. Full Drone Mode
+
 With Tello connected:
+
 ```bash
 python -m tello_vision.app
 ```
 
 Controls:
+
 - **Tab**: Takeoff
 - **W/A/S/D**: Move
 - **Space/Shift**: Up/Down
@@ -60,29 +67,33 @@ Controls:
 Edit `config.yaml`:
 
 **Want faster FPS?** Use smaller model:
+
 ```yaml
 detector:
   yolov8:
-    model: "yolov8n-seg.pt"  # n=nano (fastest)
+    model: "yolov8n-seg.pt" # n=nano (fastest)
 ```
 
 **Only track people?**
+
 ```yaml
 detector:
   target_classes: ["person"]
 ```
 
 **Adjust visualization:**
+
 ```yaml
 visualization:
-  mask_alpha: 0.4  # Mask transparency
+  mask_alpha: 0.4 # Mask transparency
   show_confidence: true
 ```
 
 **Performance tuning:**
+
 ```yaml
 processing:
-  frame_skip: 1  # Process every 2nd frame (doubles FPS)
+  frame_skip: 1 # Process every 2nd frame (doubles FPS)
 ```
 
 ## Project Structure
@@ -131,8 +142,9 @@ This demonstrates reactive control suitable for autonomous vehicles.
 ## For Self-Driving Car Work
 
 This gives you:
+
 - Real-time object detection pipeline
-- Target tracking framework  
+- Target tracking framework
 - Reactive control examples
 - Extensible architecture for adding SLAM, planning, etc.
 
@@ -145,19 +157,38 @@ Check `examples/object_follower.py` for autonomous navigation basics.
 3. **Modify config.yaml** - Tune for your use case
 4. **Extend** - Add your own detectors/controllers
 
-## Performance Reference
+## Performance Reference - NVIDIA RTX 500 Ada Generation Laptop GPU
 
-| GPU | Model | FPS |
-|-----|-------|-----|
-| RTX 3060 | YOLOv8n | 25-30 |
-| RTX 3060 | YOLOv8s | 18-22 |
-| 1050 Ti | YOLOv8n | 18-22 |
-| CPU | YOLOv8n | 2-3 |
+| Model              | Size   | FPS   | Avg (ms) | Std (ms) | Min (ms) | Max (ms) | Notes               |
+| ------------------ | ------ | ----- | -------- | -------- | -------- | -------- | ------------------- |
+| YOLOv8n-seg        | Nano   | 207.8 | 4.8      | 0.4      | 4.4      | 8.2      | Fastest model       |
+| YOLOv8s-seg        | Small  | 120.2 | 8.3      | 0.1      | 8.2      | 9.1      | Most stable latency |
+| YOLOv8m-seg        | Medium | 53.2  | 18.8     | 0.5      | 16.4     | 19.6     | Balanced trade-off  |
+| Detectron2 R50-FPN | Large  | 9.7   | 102.7    | 0.8      | 101.2    | 107.5    | Slow but accurate   |
+
+---
+
+## Performance Reference Across GPUs
+
+| GPU         | Model   | FPS Range |
+| ----------- | ------- | --------- |
+| RTX 3060    | YOLOv8n | 25–30     |
+| RTX 3060    | YOLOv8s | 18–22     |
+| GTX 1050 Ti | YOLOv8n | 18–22     |
+| CPU         | YOLOv8n | 2–3       |
+
+---
+
+**Summary:**
+
+- **Fastest model:** YOLOv8n-seg (Nano) — 207.8 FPS
+- **Most stable latency:** YOLOv8s-seg (Small) — ±0.1 ms
+- **Performance leap:** RTX 500 Ada delivers **~7–8× speedup** over RTX 3060 for YOLOv8n.
 
 ## Files to Know
 
 - **config.yaml** - All settings
-- **tello_vision/app.py** - Main application  
+- **tello_vision/app.py** - Main application
 - **tello_vision/detectors/base_detector.py** - Add custom models here
 - **examples/object_follower.py** - Autonomous control reference
 
