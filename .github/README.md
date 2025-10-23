@@ -2,25 +2,19 @@
 
 Modern, modular instance segmentation and object detection for DJI Tello drones. Complete rewrite with SOTA models, clean architecture, and actual performance.
 
-## What Changed (Everything)
+![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
+![License: MIT](https://img.shields.io/badge/License-Apache-yellow.svg)
+![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 
-### Old Stack (Legacy)
-- ❌ TensorFlow 1.9 (EOL 2021)
-- ❌ Python 3.6 (EOL 2021)
-- ❌ Matterport Mask R-CNN (unmaintained)
-- ❌ TelloPy (deprecated)
-- ❌ ~4.6 FPS on 1050Ti
-- ❌ Monolithic code
-- ❌ Hardcoded everything
+## 📖 Documentation Index
 
-### New Stack (Modern)
-- ✅ PyTorch 2.0+ / TensorFlow 2.x
-- ✅ Python 3.10+
-- ✅ YOLOv8 (default) or Detectron2
-- ✅ djitellopy (actively maintained)
-- ✅ 15-30+ FPS depending on model
-- ✅ Modular, extensible architecture
-- ✅ Config-driven design
+| Section                                | Description                           |
+| -------------------------------------- | ------------------------------------- |
+| [Quickstart](#-quickstart-guide)       | Get up and running fast               |
+| [Migration](#-migration-guide)         | Notes on upgrading between versions   |
+| [Improvements](#-planned-improvements) | Roadmap and ideas for future releases |
+| [License](#-license)                   | License and legal details             |
 
 ## Features
 
@@ -55,20 +49,36 @@ pip install -e ".[detectron2]"
 pip install -e ".[yolo,detectron2]"
 ```
 
-### 2. Configure
+### 2. Test Detection Without Drone
+
+Good for verifying everything works:
+
+```bash
+python examples/test_detector.py --source 0  # Webcam
+```
+
+### 3. Benchmark Your Setup
+
+See what FPS you can get:
+
+```bash
+python examples/benchmark.py
+```
+
+### 4. Configure
 
 Edit `config.yaml`:
 
 ```yaml
 detector:
-  backend: "yolov8"  # or "detectron2"
+  backend: "yolov8" # or "detectron2"
   yolov8:
-    model: "yolov8n-seg.pt"  # nano = fastest
+    model: "yolov8n-seg.pt" # nano = fastest
     confidence: 0.5
-    device: "cuda"  # or "cpu"
+    device: "cuda" # or "cpu"
 ```
 
-### 3. Run
+### 5. Test Detection With Drone
 
 ```bash
 # Make sure your Tello is powered on and connected to its WiFi
@@ -77,6 +87,17 @@ python -m tello_vision.app
 # With custom config
 python -m tello_vision.app --config my_config.yaml
 ```
+
+Controls:
+
+- **Tab**: Takeoff
+- **W/A/S/D**: Move
+- **Space/Shift**: Up/Down
+- **Q/E**: Rotate
+- **R**: Record video
+- **Enter**: Take photo
+- **Backspace**: Land
+- **P**: Quit
 
 ## Architecture
 
@@ -102,7 +123,7 @@ class MyCustomDetector(BaseDetector):
     def load_model(self):
         # Load your model
         pass
-    
+
     def detect(self, frame) -> DetectionResult:
         # Run inference
         pass
@@ -119,29 +140,29 @@ def create_detector(backend: str, config: dict):
 
 ## Controls
 
-| Action | Key |
-|--------|-----|
-| Takeoff | Tab |
-| Land | Backspace |
-| Emergency Stop | Esc |
-| Move | W/A/S/D |
-| Up/Down | Space/Shift |
-| Rotate | Q/E |
-| Record Video | R |
-| Take Photo | Enter |
-| Quit | P |
+| Action         | Key         |
+| -------------- | ----------- |
+| Takeoff        | Tab         |
+| Land           | Backspace   |
+| Emergency Stop | Esc         |
+| Move           | W/A/S/D     |
+| Up/Down        | Space/Shift |
+| Rotate         | Q/E         |
+| Record Video   | R           |
+| Take Photo     | Enter       |
+| Quit           | P           |
 
 ## Performance Comparison
 
-| Model | Device | FPS | mAP | Use Case |
-|-------|--------|-----|-----|----------|
-| YOLOv8n-seg | RTX 3060 | 25-30 | ~35 | Real-time, fast |
-| YOLOv8s-seg | RTX 3060 | 18-22 | ~38 | Balanced |
-| YOLOv8m-seg | RTX 3060 | 12-15 | ~41 | Accuracy focus |
-| Detectron2 R50 | RTX 3060 | 8-12 | ~38 | High quality |
-| YOLOv8n-seg | CPU | 2-3 | ~35 | CPU fallback |
+| Model          | Device   | FPS   | mAP | Use Case        |
+| -------------- | -------- | ----- | --- | --------------- |
+| YOLOv8n-seg    | RTX 3060 | 25-30 | ~35 | Real-time, fast |
+| YOLOv8s-seg    | RTX 3060 | 18-22 | ~38 | Balanced        |
+| YOLOv8m-seg    | RTX 3060 | 12-15 | ~41 | Accuracy focus  |
+| Detectron2 R50 | RTX 3060 | 8-12  | ~38 | High quality    |
+| YOLOv8n-seg    | CPU      | 2-3   | ~35 | CPU fallback    |
 
-*FPS measured at 960x720 resolution*
+_FPS measured at 960x720 resolution_
 
 ## Configuration Guide
 
@@ -149,7 +170,7 @@ def create_detector(backend: str, config: dict):
 
 ```yaml
 detector:
-  target_classes: ["person", "car", "dog"]  # Only detect these
+  target_classes: ["person", "car", "dog"] # Only detect these
 ```
 
 ### Adjust Visualization
@@ -157,7 +178,7 @@ detector:
 ```yaml
 visualization:
   show_masks: true
-  mask_alpha: 0.4  # Transparency
+  mask_alpha: 0.4 # Transparency
   show_boxes: true
   box_thickness: 2
   show_confidence: true
@@ -167,8 +188,8 @@ visualization:
 
 ```yaml
 processing:
-  frame_skip: 1  # Process every 2nd frame (doubles FPS)
-  async_inference: true  # Run detection in separate thread
+  frame_skip: 1 # Process every 2nd frame (doubles FPS)
+  async_inference: true # Run detection in separate thread
   max_queue_size: 3
 ```
 
@@ -176,7 +197,7 @@ processing:
 
 ```yaml
 processing:
-  record_video: false  # Auto-start recording
+  record_video: false # Auto-start recording
   output_dir: "./output"
   video_codec: "mp4v"
 ```
@@ -210,12 +231,12 @@ detector.load_model()
 while True:
     frame = drone.get_frame()
     result = detector.detect(frame)
-    
+
     # Custom logic here
     for det in result.detections:
         if det.class_name == 'person' and det.confidence > 0.8:
             print(f"Person detected at {det.center}")
-    
+
     frame = visualizer.draw_detections(frame, result)
 ```
 
@@ -224,7 +245,9 @@ while True:
 Since you're exploring autonomous vehicles, here are some ideas:
 
 ### 1. Object Tracking
+
 Add a tracker to follow specific objects:
+
 ```python
 # Use ByteTrack or SORT
 from boxmot import ByteTrack
@@ -234,14 +257,18 @@ tracks = tracker.update(detections, frame)
 ```
 
 ### 2. Path Planning
+
 Integrate with planning algorithms:
+
 ```python
 if 'person' in detected_classes:
     drone.move_left(30)  # Avoid obstacle
 ```
 
 ### 3. SLAM Integration
+
 Connect with ORB-SLAM or similar:
+
 ```python
 from orbslam3 import System
 
@@ -250,11 +277,13 @@ pose = slam.process_image_mono(frame, timestamp)
 ```
 
 ### 4. Semantic Segmentation
+
 Add depth estimation or semantic maps for better navigation.
 
 ## Troubleshooting
 
 ### Connection Issues
+
 ```bash
 # Check WiFi connection
 ping 192.168.10.1
@@ -264,12 +293,14 @@ ping 192.168.10.1
 ```
 
 ### Performance Issues
+
 - Use smaller model: `yolov8n-seg.pt` instead of `yolov8x-seg.pt`
 - Enable frame skipping: `frame_skip: 1` or `2`
 - Lower confidence threshold may increase speed
 - Use GPU if available
 
 ### Import Errors
+
 ```bash
 # YOLOv8
 pip install ultralytics
@@ -309,15 +340,7 @@ mypy tello_vision/
 
 ## License
 
-MIT License - fork it, break it, make it better.
-
-## Contributing
-
-PRs welcome! Areas that need work:
-- Additional detector backends (RT-DETR, SAM, etc.)
-- Object tracking integration
-- Performance optimizations
-- Documentation improvements
+Apache License, Version 2.0 - fork it, break it, make it better.
 
 ## Acknowledgments
 
