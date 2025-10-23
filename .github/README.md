@@ -49,7 +49,23 @@ pip install -e ".[detectron2]"
 pip install -e ".[yolo,detectron2]"
 ```
 
-### 2. Configure
+### 2. Test Detection Without Drone
+
+Good for verifying everything works:
+
+```bash
+python examples/test_detector.py --source 0  # Webcam
+```
+
+### 3. Benchmark Your Setup
+
+See what FPS you can get:
+
+```bash
+python examples/benchmark.py
+```
+
+### 4. Configure
 
 Edit `config.yaml`:
 
@@ -62,7 +78,7 @@ detector:
     device: "cuda" # or "cpu"
 ```
 
-### 3. Test Detection With Drone
+### 5. Test Detection With Drone
 
 ```bash
 # Make sure your Tello is powered on and connected to its WiFi
@@ -70,22 +86,6 @@ python -m tello_vision.app
 
 # With custom config
 python -m tello_vision.app --config my_config.yaml
-```
-
-### 4. Test Detection Without Drone
-
-Good for verifying everything works:
-
-```bash
-python examples/test_detector.py --source 0  # Webcam
-```
-
-### 5. Benchmark Your Setup
-
-See what FPS you can get:
-
-```bash
-python examples/benchmark.py
 ```
 
 Controls:
