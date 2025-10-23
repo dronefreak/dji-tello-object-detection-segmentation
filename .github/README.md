@@ -88,16 +88,19 @@ python -m tello_vision.app
 python -m tello_vision.app --config my_config.yaml
 ```
 
-Controls:
+### Controls
 
-- **Tab**: Takeoff
-- **W/A/S/D**: Move
-- **Space/Shift**: Up/Down
-- **Q/E**: Rotate
-- **R**: Record video
-- **Enter**: Take photo
-- **Backspace**: Land
-- **P**: Quit
+| Action         | Key         |
+| -------------- | ----------- |
+| Takeoff        | Tab         |
+| Land           | Backspace   |
+| Emergency Stop | Esc         |
+| Move           | W/A/S/D     |
+| Up/Down        | Space/Shift |
+| Rotate         | Q/E         |
+| Record Video   | R           |
+| Take Photo     | Enter       |
+| Quit           | P           |
 
 ## Architecture
 
@@ -137,20 +140,6 @@ def create_detector(backend: str, config: dict):
         from .my_custom_detector import MyCustomDetector
         return MyCustomDetector(config)
 ```
-
-## Controls
-
-| Action         | Key         |
-| -------------- | ----------- |
-| Takeoff        | Tab         |
-| Land           | Backspace   |
-| Emergency Stop | Esc         |
-| Move           | W/A/S/D     |
-| Up/Down        | Space/Shift |
-| Rotate         | Q/E         |
-| Record Video   | R           |
-| Take Photo     | Enter       |
-| Quit           | P           |
 
 ## Performance Comparison
 
