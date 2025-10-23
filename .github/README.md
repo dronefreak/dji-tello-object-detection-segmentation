@@ -2,27 +2,19 @@
 
 Modern, modular instance segmentation and object detection for DJI Tello drones. Complete rewrite with SOTA models, clean architecture, and actual performance.
 
-## What Changed (Everything)
+![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
+![License: MIT](https://img.shields.io/badge/License-Apache-yellow.svg)
+![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 
-### Old Stack (Legacy)
+## 📖 Documentation Index
 
-- ❌ TensorFlow 1.9 (EOL 2021)
-- ❌ Python 3.6 (EOL 2021)
-- ❌ Matterport Mask R-CNN (unmaintained)
-- ❌ TelloPy (deprecated)
-- ❌ ~4.6 FPS on 1050Ti
-- ❌ Monolithic code
-- ❌ Hardcoded everything
-
-### New Stack (Modern)
-
-- ✅ PyTorch 2.0+ / TensorFlow 2.x
-- ✅ Python 3.10+
-- ✅ YOLOv8 (default) or Detectron2
-- ✅ djitellopy (actively maintained)
-- ✅ 15-30+ FPS depending on model
-- ✅ Modular, extensible architecture
-- ✅ Config-driven design
+| Section                                | Description                           |
+| -------------------------------------- | ------------------------------------- |
+| [Quickstart](#-quickstart-guide)       | Get up and running fast               |
+| [Migration](#-migration-guide)         | Notes on upgrading between versions   |
+| [Improvements](#-planned-improvements) | Roadmap and ideas for future releases |
+| [License](#-license)                   | License and legal details             |
 
 ## Features
 
@@ -70,7 +62,7 @@ detector:
     device: "cuda" # or "cpu"
 ```
 
-### 3. Run
+### 3. Test Detection With Drone
 
 ```bash
 # Make sure your Tello is powered on and connected to its WiFi
@@ -79,6 +71,33 @@ python -m tello_vision.app
 # With custom config
 python -m tello_vision.app --config my_config.yaml
 ```
+
+### 4. Test Detection Without Drone
+
+Good for verifying everything works:
+
+```bash
+python examples/test_detector.py --source 0  # Webcam
+```
+
+### 5. Benchmark Your Setup
+
+See what FPS you can get:
+
+```bash
+python examples/benchmark.py
+```
+
+Controls:
+
+- **Tab**: Takeoff
+- **W/A/S/D**: Move
+- **Space/Shift**: Up/Down
+- **Q/E**: Rotate
+- **R**: Record video
+- **Enter**: Take photo
+- **Backspace**: Land
+- **P**: Quit
 
 ## Architecture
 
@@ -321,16 +340,7 @@ mypy tello_vision/
 
 ## License
 
-MIT License - fork it, break it, make it better.
-
-## Contributing
-
-PRs welcome! Areas that need work:
-
-- Additional detector backends (RT-DETR, SAM, etc.)
-- Object tracking integration
-- Performance optimizations
-- Documentation improvements
+Apache License, Version 2.0 - fork it, break it, make it better.
 
 ## Acknowledgments
 
