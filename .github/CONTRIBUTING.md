@@ -6,20 +6,40 @@ The following is a set of guidelines for contributing to Tello Vision. These are
 
 ## Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
-- [How Can I Contribute?](#how-can-i-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Enhancements](#suggesting-enhancements)
-  - [Your First Code Contribution](#your-first-code-contribution)
-  - [Pull Requests](#pull-requests)
-- [Style Guides](#style-guides)
-  - [Git Commit Messages](#git-commit-messages)
-  - [Python Style Guide](#python-style-guide)
-  - [Documentation Style Guide](#documentation-style-guide)
-- [Development Setup](#development-setup)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
-- [Additional Notes](#additional-notes)
+- [Contributing to Tello Vision](#contributing-to-tello-vision)
+  - [Table of Contents](#table-of-contents)
+  - [Code of Conduct](#code-of-conduct)
+  - [How Can I Contribute?](#how-can-i-contribute)
+    - [Reporting Bugs](#reporting-bugs)
+    - [Suggesting Enhancements](#suggesting-enhancements)
+    - [Your First Code Contribution](#your-first-code-contribution)
+    - [Pull Requests](#pull-requests)
+  - [Style Guides](#style-guides)
+    - [Git Commit Messages](#git-commit-messages)
+    - [Python Style Guide](#python-style-guide)
+    - [Documentation Style Guide](#documentation-style-guide)
+  - [Development Setup](#development-setup)
+    - [1. Fork and Clone](#1-fork-and-clone)
+    - [2. Create Virtual Environment](#2-create-virtual-environment)
+    - [3. Install Development Dependencies](#3-install-development-dependencies)
+    - [4. Create a Branch](#4-create-a-branch)
+    - [5. Make Changes](#5-make-changes)
+    - [6. Format and Lint](#6-format-and-lint)
+    - [7. Test Your Changes](#7-test-your-changes)
+    - [8. Commit and Push](#8-commit-and-push)
+    - [9. Create Pull Request](#9-create-pull-request)
+  - [Project Structure](#project-structure)
+  - [Testing](#testing)
+  - [Adding a New Detector Backend](#adding-a-new-detector-backend)
+    - [1. Create Detector Class](#1-create-detector-class)
+    - [2. Register in Factory](#2-register-in-factory)
+    - [3. Add Configuration](#3-add-configuration)
+    - [4. Test It](#4-test-it)
+    - [5. Update Documentation](#5-update-documentation)
+  - [Additional Notes](#additional-notes)
+    - [Issue and Pull Request Labels](#issue-and-pull-request-labels)
+    - [Recognition](#recognition)
+    - [Questions?](#questions)
 
 ## Code of Conduct
 
@@ -251,7 +271,7 @@ mypy tello_vision/
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/tello-vision.git
+git clone https://github.com/dronefreak/dji-tello-object-detection-segmentation.git
 cd tello-vision
 ```
 

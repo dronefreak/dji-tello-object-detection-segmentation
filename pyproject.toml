@@ -48,9 +48,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/tello-vision"
-Repository = "https://github.com/yourusername/tello-vision"
-Issues = "https://github.com/yourusername/tello-vision/issues"
+Homepage = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git"
+Repository = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git"
+Issues = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git/issues"
 
 [tool.black]
 line-length = 88
