@@ -32,7 +32,7 @@ Modern, modular instance segmentation and object detection for DJI Tello drones.
 
 ```bash
 # Clone the repo
-git clone <your-repo-url>
+git clone https://github.com/dronefreak/dji-tello-object-detection-segmentation
 cd tello_vision
 
 # Create virtual environment
