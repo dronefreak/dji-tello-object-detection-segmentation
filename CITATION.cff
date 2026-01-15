@@ -4,16 +4,16 @@ type: software
 title: "Tello Vision: Modern Instance Segmentation for DJI Tello Drones"
 version: 2.0.0
 date-released: 2025-01-15
-url: "https://github.com/yourusername/tello-vision"
-repository-code: "https://github.com/yourusername/tello-vision"
+url: "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
+repository-code: "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
 license: MIT
 
 authors:
-  - family-names: "Your Last Name"
-    given-names: "Your First Name"
-    email: your.email@example.com
-    affiliation: "Your Institution"
-    orcid: "https://orcid.org/0000-0000-0000-0000"
+  - family-names: "Saksena"
+    given-names: "Saumya"
+    email: kumaar324@gmail.com
+    affiliation: "UTwente, The Netherlands"
+    orcid: "https://orcid.org/0000-0003-2213-8265"
 
 keywords:
   - computer vision
@@ -67,15 +67,15 @@ preferred-citation:
   type: software
   title: "Tello Vision: Modern Instance Segmentation for DJI Tello Drones"
   authors:
-    - family-names: "Your Last Name"
-      given-names: "Your First Name"
+    - family-names: "Saksena"
+      given-names: "Saumya"
   version: 2.0.0
   date-released: 2025-01-15
-  url: "https://github.com/yourusername/tello-vision"
+  url: "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
   license: MIT
   
 # BibTeX entry
 identifiers:
   - type: url
-    value: "https://github.com/yourusername/tello-vision"
+    value: "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
     description: "GitHub repository"
