@@ -116,7 +116,7 @@ class TelloVisionApp:
         if self.processing_config.get("display_stats", True):
             stats = self.drone.get_stats_text()
             stats.append(f"Detections: {result.count}")
-            stats.append(f"Inference: {result.inference_time*1000:.1f}ms")
+            stats.append(f"Inference: {result.inference_time * 1000:.1f}ms")
             frame = self.visualizer.draw_stats(frame, stats)
 
         # Draw FPS if enabled
