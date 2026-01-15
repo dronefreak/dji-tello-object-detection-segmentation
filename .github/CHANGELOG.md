@@ -39,6 +39,6 @@ A complete rewrite of the codebase with major modernization, performance improve
 
 **Repository & Contributions**:
 
-- [GitHub Repo](https://github.com/yourusername/tello-vision)
-- [Issues](https://github.com/yourusername/tello-vision/issues)
+- [GitHub Repo](https://github.com/dronefreak/dji-tello-object-detection-segmentation)
+- [Issues](https://github.com/dronefreak/dji-tello-object-detection-segmentation/issues)
 - Original repository: [dronefreak/dji-tello-object-detection-segmentation](https://github.com/dronefreak/dji-tello-object-detection-segmentation)
