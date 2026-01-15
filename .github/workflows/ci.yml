@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [master, dev, feat/*, fix/*]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pre-commit:
     name: Pre-commit Checks
