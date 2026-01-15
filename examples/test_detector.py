@@ -79,7 +79,7 @@ def main():
             # Show stats
             stats = [
                 f"Detections: {result.count}",
-                f"Inference: {result.inference_time*1000:.1f}ms",
+                f"Inference: {result.inference_time * 1000:.1f}ms",
             ]
             frame = visualizer.draw_stats(frame, stats)
 

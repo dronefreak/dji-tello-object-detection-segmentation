@@ -1,0 +1,81 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Tello Vision: Modern Instance Segmentation for DJI Tello Drones"
+version: 2.0.0
+date-released: 2025-01-15
+url: "https://github.com/yourusername/tello-vision"
+repository-code: "https://github.com/yourusername/tello-vision"
+license: MIT
+
+authors:
+  - family-names: "Your Last Name"
+    given-names: "Your First Name"
+    email: your.email@example.com
+    affiliation: "Your Institution"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+
+keywords:
+  - computer vision
+  - instance segmentation
+  - object detection
+  - drone
+  - DJI Tello
+  - YOLOv8
+  - Detectron2
+  - PyTorch
+  - autonomous systems
+  - aerial robotics
+  - real-time detection
+
+abstract: >
+  Tello Vision is a modern, modular computer vision system for DJI Tello
+  drones featuring real-time instance segmentation and object detection.
+  Built on PyTorch with pluggable backends (YOLOv8, Detectron2), it provides
+  5-6x performance improvement over legacy implementations, achieving 25-30 FPS
+  on modern GPUs. The system includes a clean architecture with separate
+  modules for detection, visualization, and drone control, making it ideal
+  for research, education, and autonomous navigation applications.
+
+references:
+  - type: software
+    title: "Original DJI Tello Object Detection Implementation"
+    authors:
+      - name: "dronefreak"
+    repository-code: "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
+    
+  - type: software
+    title: "Ultralytics YOLOv8"
+    authors:
+      - name: "Ultralytics"
+    url: "https://github.com/ultralytics/ultralytics"
+    
+  - type: software
+    title: "Detectron2"
+    authors:
+      - name: "Facebook AI Research"
+    url: "https://github.com/facebookresearch/detectron2"
+    
+  - type: software
+    title: "djitellopy: DJI Tello drone Python interface"
+    authors:
+      - name: "damiafuentes"
+    url: "https://github.com/damiafuentes/DJITelloPy"
+
+# Preferred citation format
+preferred-citation:
+  type: software
+  title: "Tello Vision: Modern Instance Segmentation for DJI Tello Drones"
+  authors:
+    - family-names: "Your Last Name"
+      given-names: "Your First Name"
+  version: 2.0.0
+  date-released: 2025-01-15
+  url: "https://github.com/yourusername/tello-vision"
+  license: MIT
+  
+# BibTeX entry
+identifiers:
+  - type: url
+    value: "https://github.com/yourusername/tello-vision"
+    description: "GitHub repository"

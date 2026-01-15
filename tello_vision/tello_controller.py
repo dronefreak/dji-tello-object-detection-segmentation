@@ -82,13 +82,13 @@ class TelloController:
 
         try:
             self.drone.streamoff()
-        except:
-            pass
+        except Exception as e:
+            print(f"Error stopping stream: {e}")
 
         try:
             self.drone.end()
-        except:
-            pass
+        except Exception as e:
+            print(f"Error ending connection: {e}")
 
         if self.listener:
             self.listener.stop()
@@ -217,8 +217,8 @@ class TelloController:
             self.temperature = self.drone.get_temperature()
             self.flight_time = self.drone.get_flight_time()
             self.height = self.drone.get_height()
-        except:
-            pass
+        except Exception as e:
+            print(f"Error updating stats: {e}")
 
     def get_stats_text(self) -> list:
         """Get formatted stats text for display.

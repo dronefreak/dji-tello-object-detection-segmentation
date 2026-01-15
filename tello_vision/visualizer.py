@@ -40,9 +40,9 @@ class Visualizer:
             # Generate random but consistent color
             random.seed(hash(class_name))
             self.class_colors[class_name] = (
-                random.randint(0, 255),
-                random.randint(0, 255),
-                random.randint(0, 255),
+                random.randint(0, 255),  # nosec B311
+                random.randint(0, 255),  # nosec B311
+                random.randint(0, 255),  # nosec B311
             )
         return self.class_colors[class_name]
 

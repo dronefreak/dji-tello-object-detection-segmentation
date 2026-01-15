@@ -3,12 +3,11 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tello-vision"
+name = "dji-tello-object-detection-segmentation"
 version = "2.0.0"
 description = "Modern instance segmentation and object detection for DJI Tello drones"
-readme = "README.md"
+readme = ".github/README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
 authors = [
     {name = "Saumya Saksena", email = "kumaar324@gmail.com"}
 ]
@@ -16,7 +15,6 @@ keywords = ["drone", "computer-vision", "segmentation", "object-detection", "tel
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -35,22 +33,25 @@ dependencies = [
 
 [project.optional-dependencies]
 detectron2 = [
-    "detectron2 @ git+https://github.com/facebookresearch/detectron2.git",
+    # Note: Install manually after torch is installed
+    # pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ]
 yolo = [
     "ultralytics>=8.0.0",
 ]
 dev = [
     "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git"
-Repository = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git"
-Issues = "https://github.com/dronefreak/dji-tello-object-detection-segmentation.git/issues"
+Homepage = "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
+Repository = "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
+Issues = "https://github.com/dronefreak/dji-tello-object-detection-segmentation/issues"
 
 [tool.black]
 line-length = 88
@@ -66,3 +67,46 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that may require external services",
+    "slow: Tests that take a long time to run",
+    "drone: Tests that require an actual Tello drone",
+    "gpu: Tests that require GPU",
+]
+
+[tool.coverage.run]
+source = ["tello_vision"]
+omit = [
+    "*/tests/*",
+    "*/examples/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
