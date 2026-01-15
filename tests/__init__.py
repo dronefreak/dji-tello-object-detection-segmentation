@@ -1,4 +1,4 @@
 """Test suite for Tello Vision.
 
-Run tests with: pytest
+Run tests with: python -m pytest -vvv ./tests/
 """
