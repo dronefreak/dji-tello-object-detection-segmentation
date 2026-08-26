@@ -1,5 +1,17 @@
 ### Tello Vision – Changelog Summary
 
+**Unreleased**
+
+- **Fix**: `tello_vision` could not be imported on displayless systems
+  (e.g. CI runners) - `pynput.keyboard` performs X11 backend detection
+  at import time, which raised `ImportError` with no `DISPLAY`. The
+  import is now deferred to where it's actually needed.
+- **Fix**: CI's Documentation Check job checked for
+  `README.md`/`CODE_OF_CONDUCT.md`/`SECURITY.md` at the repo root; these
+  live under `.github/`.
+- **Tooling**: mypy added as a blocking pre-commit hook and CI check
+  (`tello_vision/`, `tests/`, `examples/`).
+
 **Version 2.0.0 – 2025-01-15**
 A complete rewrite of the codebase with major modernization, performance improvements, and extensibility enhancements.
 

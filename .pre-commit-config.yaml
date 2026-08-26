@@ -11,7 +11,21 @@ repos:
       - id: ruff-format
         types_or: [python, pyi]
 
-  # 2. pre-commit hooks for safety
+  # 2. mypy: static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        name: mypy (deep scan)
+        files: ^(tello_vision|tests|examples)/
+        args:
+          - --ignore-missing-imports
+          - --no-error-summary
+          - --pretty
+        additional_dependencies:
+          - types-PyYAML
+
+  # 3. pre-commit hooks for safety
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -26,14 +40,14 @@ repos:
       - id: check-yaml
       - id: detect-private-key
 
-  # 3. prettier for markdown/yaml/json/xml/toml
+  # 4. prettier for markdown/yaml/json/xml/toml
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         types_or: [markdown, yaml, json, xml, toml]
 
-  # 4. clang-format for C/C++ files
+  # 5. clang-format for C/C++ files
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v16.0.6
     hooks:

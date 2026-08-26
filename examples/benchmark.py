@@ -73,7 +73,7 @@ def benchmark_detector(
     }
 
 
-def main():
+def main() -> None:
     """Run the detector benchmarking CLI."""
     parser = argparse.ArgumentParser(description="Benchmark detectors")
     parser.add_argument(

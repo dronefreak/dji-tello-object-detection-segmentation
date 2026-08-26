@@ -12,14 +12,21 @@ This is a starting point for self-driving car concepts applied to drones:
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 import yaml
-from tello_vision.detectors.base_detector import BaseDetector
+from tello_vision.detectors.base_detector import (
+    BaseDetector,
+    Detection,
+    DetectionResult,
+)
 from tello_vision.tello_controller import TelloController
 from tello_vision.visualizer import Visualizer
+
+# (lr, fb, ud, yaw) RC control values, as returned by ObjectFollower.update().
+ControlVector = Tuple[int, int, int, int]
 
 # Number of recent target positions to average for jitter smoothing.
 SMOOTHING_WINDOW = 3
@@ -71,7 +78,7 @@ class PIDController:
 
         self._integral = 0.0
         self._prev_error = 0.0
-        self._prev_time = None
+        self._prev_time: Optional[float] = None
 
     def reset(self) -> None:
         """Reset accumulated state (integral/derivative history)."""
@@ -137,11 +144,13 @@ class ObjectFollower:
         self.forward_speed = 20
 
         # Tracking state
-        self.target_history = deque(maxlen=5)  # Smooth tracking
+        self.target_history: deque = deque(maxlen=5)  # Smooth tracking
         self.lost_frames = 0
         self.max_lost_frames = 30
 
-    def find_target(self, result, frame_shape):
+    def find_target(
+        self, result: DetectionResult, frame_shape: Tuple[int, ...]
+    ) -> Optional[Detection]:
         """Find the best target in detections."""
         candidates = [d for d in result.detections if d.class_name == self.target_class]
 
@@ -151,7 +160,9 @@ class ObjectFollower:
         # Choose largest detection (closest object)
         return max(candidates, key=lambda d: d.area)
 
-    def calculate_control(self, target, frame_shape):
+    def calculate_control(
+        self, target: Detection, frame_shape: Tuple[int, ...]
+    ) -> ControlVector:
         """
         Calculate control commands based on target position.
 
@@ -188,7 +199,9 @@ class ObjectFollower:
 
         return lr, fb, ud, yaw
 
-    def update(self, result, frame_shape):
+    def update(
+        self, result: DetectionResult, frame_shape: Tuple[int, ...]
+    ) -> Tuple[Optional[ControlVector], Optional[Detection]]:
         """
         Update tracking and return control commands.
 
@@ -232,7 +245,7 @@ class ObjectFollower:
             return None, None
 
 
-def _initialize():
+def _initialize() -> Tuple[TelloController, BaseDetector, Visualizer, str]:
     """
     Load config and construct drone/detector/visualizer components.
 
@@ -299,14 +312,19 @@ def _handle_key(key: int, drone: TelloController, auto_follow: bool) -> tuple:
 class FrameState:
     """Per-frame control/tracking context passed to `_draw_frame`."""
 
-    control: Optional[tuple]
-    target: Optional[object]
+    control: Optional[ControlVector]
+    target: Optional[Detection]
     auto_follow: bool
     follower: "ObjectFollower"
     target_class: str
 
 
-def _draw_frame(visualizer, frame, result, frame_state):
+def _draw_frame(
+    visualizer: Visualizer,
+    frame: np.ndarray,
+    result: DetectionResult,
+    frame_state: "FrameState",
+) -> np.ndarray:
     """
     Draw detections, tracking indicator, and status overlays on a frame.
 
@@ -348,7 +366,7 @@ def _draw_frame(visualizer, frame, result, frame_state):
     return visualizer.draw_crosshair(frame)
 
 
-def main():
+def main() -> None:
     """Run the interactive object-following demo."""
     drone, detector, visualizer, target_class = _initialize()
     follower = ObjectFollower(target_class=target_class)
