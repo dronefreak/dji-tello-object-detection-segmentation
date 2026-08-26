@@ -1,0 +1,18 @@
+extends: default
+
+rules:
+  # GitHub Actions workflows and config.yaml aren't meant to wrap at the
+  # traditional 80-column default; relax it to something that actually
+  # reflects this repo's style.
+  line-length:
+    max: 120
+  # A leading "---" document marker isn't conventional for GitHub Actions
+  # workflow files or this repo's config.yaml.
+  document-start: disable
+  # Only flag ambiguous truthy *values* (e.g. `foo: yes`), not keys -
+  # GitHub Actions' `on:` trigger key is a YAML 1.1 truthy-looking key
+  # that's intentional, required syntax.
+  truthy:
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1

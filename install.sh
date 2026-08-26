@@ -24,6 +24,7 @@ echo ""
 # Create virtual environment
 echo "[1/4] Creating virtual environment..."
 python3 -m venv venv
+# shellcheck disable=SC1091  # created by the venv command just above
 source venv/bin/activate
 echo "✓ Virtual environment created"
 echo ""
@@ -39,7 +40,7 @@ echo "[3/4] Select detector backend:"
 echo "  1) YOLOv8 (recommended - fast, real-time)"
 echo "  2) Detectron2 (slower but more accurate)"
 echo "  3) Both (requires more disk space)"
-read -p "Enter choice [1-3]: " backend_choice
+read -r -p "Enter choice [1-3]: " backend_choice
 
 case $backend_choice in
     1)
