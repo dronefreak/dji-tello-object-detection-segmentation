@@ -23,7 +23,14 @@ def sample_config():
                 "device": "cpu",
             },
         },
-        "drone": {"speed": 50, "video_bitrate": 4, "fps": 30, "resolution": [960, 720]},
+        "drone": {
+            "speed": 50,
+            "video_bitrate": 4,
+            "fps": 30,
+            "resolution": [960, 720],
+            "connect_retries": 1,
+            "connect_retry_delay": 0,
+        },
         "visualization": {
             "show_boxes": True,
             "show_masks": True,
