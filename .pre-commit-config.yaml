@@ -1,4 +1,8 @@
 # Note: pre-commit ignores anything already ignored by Git.
+# Installs both hook types via a plain `pre-commit install` (no extra
+# --hook-type flag needed) so the commit-msg hook below actually runs.
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   # 1. Ruff: lint + format + import-sort + docstring checks (replaces
   # isort, black, flake8, pep8-naming, docformatter)
@@ -37,7 +41,39 @@ repos:
           - medium
         files: ^(tello_vision|examples)/
 
-  # 4. pre-commit hooks for safety
+  # 4. yamllint: YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        files: '(^config\.yaml$|^\.github/workflows/.*\.ya?ml$)'
+
+  # 5. markdownlint: Markdown linting (auto-fixing)
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.49.1
+    hooks:
+      - id: markdownlint-fix
+        files: '(^|/)README\.md$'
+        args:
+          - --disable
+          - MD013 # line length
+          - MD033 # inline HTML (badges, centered images)
+          - MD041 # first line must be a top-level heading
+          - MD024 # duplicate headings
+          - MD036 # emphasis used as a heading (table caption)
+
+  # 6. shellcheck + shfmt: shell script linting/formatting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        args: [--write, --indent, "4", --case-indent]
+
+  # 7. pre-commit hooks for safety
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -52,17 +88,25 @@ repos:
       - id: check-yaml
       - id: detect-private-key
 
-  # 5. prettier for markdown/yaml/json/xml/toml
+  # 8. prettier for markdown/yaml/json/xml/toml
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         types_or: [markdown, yaml, json, xml, toml]
 
-  # 6. clang-format for C/C++ files
+  # 9. clang-format for C/C++ files
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v16.0.6
     hooks:
       - id: clang-format
         files: '\.(cpp|cxx|cc|hpp|hxx|hh)$'
         exclude: "third_party|generated"
+
+  # 10. Enforce Conventional Commits on commit messages (future commits
+  # only - this hook only ever sees the message being written).
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]

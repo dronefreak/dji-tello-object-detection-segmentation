@@ -17,6 +17,13 @@
   `visualizer.py` didn't actually suppress bandit's B311 finding -
   bandit's nosec regex requires `nosec` to immediately follow a `#`.
   Reordered to `# nosec B311  # noqa: S311`, which both tools honor.
+- **Tooling**: yamllint, markdownlint, shellcheck/shfmt, and
+  conventional-commit (commit-msg) hooks added to pre-commit. Fixed the
+  violations they surfaced: broken doc-index links and a missing
+  code-fence language in `.github/README.md`, and a shellcheck/shfmt
+  cleanup of `install.sh` (quoted `read`, a `# shellcheck disable`
+  for the not-yet-created venv activate script, consistent 4-space
+  indentation).
 
 **Version 2.0.0 – 2025-01-15**
 A complete rewrite of the codebase with major modernization, performance improvements, and extensibility enhancements.

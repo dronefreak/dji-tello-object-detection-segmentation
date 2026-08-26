@@ -9,12 +9,12 @@ Modern, modular instance segmentation and object detection for DJI Tello drones.
 
 ## 📖 Documentation Index
 
-| Section                                | Description                           |
-| -------------------------------------- | ------------------------------------- |
-| [Quickstart](#-quickstart-guide)       | Get up and running fast               |
-| [Migration](#-migration-guide)         | Notes on upgrading between versions   |
-| [Improvements](#-planned-improvements) | Roadmap and ideas for future releases |
-| [License](#-license)                   | License and legal details             |
+| Section                         | Description                           |
+| ------------------------------- | ------------------------------------- |
+| [Quickstart](QUICKSTART.md)     | Get up and running fast               |
+| [Migration](MIGRATION.md)       | Notes on upgrading between versions   |
+| [Improvements](IMPROVEMENTS.md) | Roadmap and ideas for future releases |
+| [License](#license)             | License and legal details             |
 
 ## Features
 
@@ -108,7 +108,7 @@ python -m tello_vision.app --config my_config.yaml
 
 ## Architecture
 
-```
+```text
 tello_vision/
 ├── detectors/
 │   ├── base_detector.py      # Abstract detector interface
