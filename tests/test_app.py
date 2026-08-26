@@ -265,8 +265,86 @@ class TestTelloVisionApp:
 
         assert result is False
 
+    @patch("tello_vision.app.cv2.VideoCapture")
+    @patch("tello_vision.app.TelloController")
+    @patch("tello_vision.app.BaseDetector")
+    @patch("tello_vision.app.Visualizer")
+    def test_no_drone_mode_uses_webcam(
+        self,
+        mock_viz,
+        mock_detector,
+        mock_controller,
+        mock_video_capture,
+        sample_config,
+        sample_frame,
+        tmp_path,
+    ):
+        """--no-drone mode opens the webcam and skips drone connect/controls."""
+        config_path = tmp_path / "test_config.yaml"
+        import yaml
 
-class TestAppConfiguration:
+        with open(config_path, "w") as f:
+            yaml.dump(sample_config, f)
+
+        mock_detector_instance = Mock()
+        mock_detector.create_detector.return_value = mock_detector_instance
+
+        mock_capture_instance = Mock()
+        mock_capture_instance.isOpened.return_value = True
+        mock_capture_instance.read.return_value = (True, sample_frame)
+        mock_video_capture.return_value = mock_capture_instance
+
+        mock_controller_instance = Mock()
+        mock_controller.return_value = mock_controller_instance
+
+        app = TelloVisionApp(str(config_path), no_drone=True)
+        result = app.initialize()
+
+        assert result is True
+        # Should never touch the drone in --no-drone mode.
+        mock_controller_instance.connect.assert_not_called()
+        mock_controller_instance.setup_keyboard_controls.assert_not_called()
+
+        frame = app.get_frame()
+        assert frame is not None
+        mock_capture_instance.read.assert_called_once()
+
+        app.shutdown()
+        mock_capture_instance.release.assert_called_once()
+        assert app.video_capture is None
+
+    @patch("tello_vision.app.cv2.VideoCapture")
+    @patch("tello_vision.app.TelloController")
+    @patch("tello_vision.app.BaseDetector")
+    @patch("tello_vision.app.Visualizer")
+    def test_no_drone_mode_webcam_open_failure(
+        self,
+        mock_viz,
+        mock_detector,
+        mock_controller,
+        mock_video_capture,
+        sample_config,
+        tmp_path,
+    ):
+        """Initialize() fails cleanly if the webcam can't be opened."""
+        config_path = tmp_path / "test_config.yaml"
+        import yaml
+
+        with open(config_path, "w") as f:
+            yaml.dump(sample_config, f)
+
+        mock_detector_instance = Mock()
+        mock_detector.create_detector.return_value = mock_detector_instance
+
+        mock_capture_instance = Mock()
+        mock_capture_instance.isOpened.return_value = False
+        mock_video_capture.return_value = mock_capture_instance
+
+        app = TelloVisionApp(str(config_path), no_drone=True)
+        result = app.initialize()
+
+        assert result is False
+
     """Tests for configuration handling."""
 
     @patch("tello_vision.app.TelloController")

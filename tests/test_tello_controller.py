@@ -222,6 +222,68 @@ class TestTelloController:
         mock_drone.streamoff.assert_called()
         mock_drone.end.assert_called()
 
+    @patch("tello_vision.tello_controller.Tello")
+    def test_disconnect_stops_video_stream_thread(
+        self, mock_tello_class, sample_config
+    ):
+        """Disconnect() signals the stream thread to stop and joins it."""
+        mock_drone = Mock()
+        mock_drone.get_frame_read.return_value = Mock(frame=np.zeros((480, 640, 3)))
+        mock_tello_class.return_value = mock_drone
+
+        controller = TelloController(sample_config["drone"])
+        controller.start_video_stream()
+
+        assert controller._stream_thread is not None
+        assert controller._stream_thread.is_alive()
+
+        controller.disconnect()
+
+        assert controller._stream_thread is None
+        assert controller._stop_event.is_set()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_disconnect_stops_control_thread(self, mock_tello_class, sample_config):
+        """Disconnect() signals the keyboard control thread to stop and joins it."""
+        mock_drone = Mock()
+        mock_tello_class.return_value = mock_drone
+
+        controller = TelloController(sample_config["drone"])
+        controller.setup_keyboard_controls(sample_config["controls"])
+
+        assert controller._control_thread is not None
+        assert controller._control_thread.is_alive()
+
+        controller.disconnect()
+
+        assert controller._control_thread is None
+        assert controller._stop_event.is_set()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_disconnect_joins_threads_without_hanging(
+        self, mock_tello_class, sample_config
+    ):
+        """Disconnect() returns promptly once both worker threads exit."""
+        import time as time_module
+
+        mock_drone = Mock()
+        mock_drone.get_frame_read.return_value = Mock(frame=np.zeros((480, 640, 3)))
+        mock_tello_class.return_value = mock_drone
+
+        controller = TelloController(sample_config["drone"])
+        controller.start_video_stream()
+        controller.setup_keyboard_controls(sample_config["controls"])
+
+        start = time_module.time()
+        controller.disconnect()
+        elapsed = time_module.time() - start
+
+        # Threads poll the stop event and sleep briefly between checks, so
+        # shutdown should be fast and well within the join timeout.
+        assert elapsed < 2.0
+        assert controller._stream_thread is None
+        assert controller._control_thread is None
+
 
 @pytest.mark.drone
 class TestTelloControllerIntegration:
