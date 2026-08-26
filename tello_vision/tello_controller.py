@@ -12,6 +12,28 @@ import numpy as np
 from djitellopy import Tello
 from pynput import keyboard
 
+# Actions that map to continuous (held-key) movement, as opposed to the
+# one-shot takeoff/land/emergency actions.
+MOVEMENT_ACTIONS = (
+    "forward",
+    "backward",
+    "left",
+    "right",
+    "up",
+    "down",
+    "yaw_left",
+    "yaw_right",
+)
+
+# Default connection retry behavior. Tello WiFi connections are commonly
+# flaky, so a single failed attempt shouldn't abort the whole application.
+DEFAULT_CONNECT_RETRIES = 3
+DEFAULT_CONNECT_RETRY_DELAY = 1.0  # seconds, doubles after each attempt
+MAX_CONNECT_RETRY_DELAY = 10.0  # cap for exponential backoff
+
+# How long to wait for background threads to exit on disconnect().
+THREAD_JOIN_TIMEOUT = 2.0
+
 
 class TelloController:
     """Controller for DJI Tello drone with video streaming."""
@@ -40,39 +62,81 @@ class TelloController:
         # Control settings
         self.speed = config.get("speed", 50)
 
+        # Connection retry settings
+        self.connect_retries = config.get("connect_retries", DEFAULT_CONNECT_RETRIES)
+        self.connect_retry_delay = config.get(
+            "connect_retry_delay", DEFAULT_CONNECT_RETRY_DELAY
+        )
+
         # Keyboard listener
         self.listener: Optional[keyboard.Listener] = None
         self.active_keys = set()
+        self._active_keys_lock = threading.Lock()
+
+        # Background thread lifecycle management. A single stop event is
+        # shared by the video stream and control loops so disconnect() can
+        # reliably signal both to exit instead of leaking daemon threads.
+        self._stop_event = threading.Event()
+        self._stream_thread: Optional[threading.Thread] = None
+        self._control_thread: Optional[threading.Thread] = None
 
     def connect(self) -> bool:
-        """Connect to the Tello drone.
+        """Connect to the Tello drone, retrying transient failures.
+
+        Tello WiFi connections are commonly flaky, so this retries with
+        exponential backoff (configurable via ``connect_retries`` and
+        ``connect_retry_delay`` in the drone config) instead of aborting
+        on the first failure.
 
         Returns:
             True if connection successful
         """
-        try:
-            print("Connecting to Tello...")
-            self.drone.connect()
+        attempts = max(1, self.connect_retries)
+        delay = self.connect_retry_delay
 
-            # Get initial state
-            self.battery = self.drone.get_battery()
-            self.temperature = self.drone.get_temperature()
+        for attempt in range(1, attempts + 1):
+            try:
+                print(f"Connecting to Tello (attempt {attempt}/{attempts})...")
+                self.drone.connect()
 
-            print(f"Connected! Battery: {self.battery}%, Temp: {self.temperature}°C")
+                # Get initial state
+                self.battery = self.drone.get_battery()
+                self.temperature = self.drone.get_temperature()
 
-            # Start video stream
-            self.drone.streamon()
-            print("Video stream started")
+                print(
+                    f"Connected! Battery: {self.battery}%, "
+                    f"Temp: {self.temperature}°C"
+                )
 
-            return True
+                # Start video stream
+                self.drone.streamon()
+                print("Video stream started")
 
-        except Exception as e:
-            print(f"Connection failed: {e}")
-            return False
+                return True
+
+            except Exception as e:
+                print(f"Connection attempt {attempt}/{attempts} failed: {e}")
+                if attempt < attempts:
+                    print(f"Retrying in {delay:.1f}s...")
+                    time.sleep(delay)
+                    delay = min(delay * 2, MAX_CONNECT_RETRY_DELAY)
+
+        print("Failed to connect after all retry attempts")
+        return False
 
     def disconnect(self) -> None:
         """Disconnect from drone and cleanup."""
         print("Disconnecting...")
+
+        # Signal background threads (stream/control loops) to stop and
+        # wait for them to actually exit before tearing down the
+        # connection, to avoid races with self.drone.end()/streamoff().
+        self._stop_event.set()
+        for thread in (self._stream_thread, self._control_thread):
+            if thread is not None and thread.is_alive():
+                thread.join(timeout=THREAD_JOIN_TIMEOUT)
+        self._stream_thread = None
+        self._control_thread = None
 
         if self.is_flying:
             self.land()
@@ -117,16 +181,17 @@ class TelloController:
             callback: Optional callback function to process each frame
         """
         self.frame_callback = callback
+        self._stop_event.clear()
 
         def stream_loop():
-            while True:
+            while not self._stop_event.is_set():
                 frame = self.get_frame()
                 if frame is not None and self.frame_callback:
                     self.frame_callback(frame)
                 time.sleep(0.01)  # Small delay to prevent CPU hogging
 
-        stream_thread = threading.Thread(target=stream_loop, daemon=True)
-        stream_thread.start()
+        self._stream_thread = threading.Thread(target=stream_loop, daemon=True)
+        self._stream_thread.start()
 
     def takeoff(self) -> None:
         """Take off the drone."""
@@ -281,22 +346,12 @@ class TelloController:
                     self.land()
                 elif k == controls.get("emergency"):
                     self.emergency()
-                elif k == controls.get("forward"):
-                    self.active_keys.add("forward")
-                elif k == controls.get("backward"):
-                    self.active_keys.add("backward")
-                elif k == controls.get("left"):
-                    self.active_keys.add("left")
-                elif k == controls.get("right"):
-                    self.active_keys.add("right")
-                elif k == controls.get("up"):
-                    self.active_keys.add("up")
-                elif k == controls.get("down"):
-                    self.active_keys.add("down")
-                elif k == controls.get("yaw_left"):
-                    self.active_keys.add("yaw_left")
-                elif k == controls.get("yaw_right"):
-                    self.active_keys.add("yaw_right")
+                else:
+                    for action in MOVEMENT_ACTIONS:
+                        if k == controls.get(action):
+                            with self._active_keys_lock:
+                                self.active_keys.add(action)
+                            break
 
             except AttributeError:
                 pass
@@ -306,18 +361,10 @@ class TelloController:
                 k = key.char if hasattr(key, "char") else key.name
 
                 # Remove from active keys
-                for action in [
-                    "forward",
-                    "backward",
-                    "left",
-                    "right",
-                    "up",
-                    "down",
-                    "yaw_left",
-                    "yaw_right",
-                ]:
+                for action in MOVEMENT_ACTIONS:
                     if k == controls.get(action):
-                        self.active_keys.discard(action)
+                        with self._active_keys_lock:
+                            self.active_keys.discard(action)
 
             except AttributeError:
                 pass
@@ -325,26 +372,31 @@ class TelloController:
         self.listener = keyboard.Listener(on_press=on_press, on_release=on_release)
         self.listener.start()
 
+        self._stop_event.clear()
+
         # Start control loop for continuous movement
         def control_loop():
-            while True:
+            while not self._stop_event.is_set():
                 lr = fb = ud = yaw = 0
 
-                if "forward" in self.active_keys:
+                with self._active_keys_lock:
+                    active_keys = set(self.active_keys)
+
+                if "forward" in active_keys:
                     fb = self.speed
-                if "backward" in self.active_keys:
+                if "backward" in active_keys:
                     fb = -self.speed
-                if "left" in self.active_keys:
+                if "left" in active_keys:
                     lr = -self.speed
-                if "right" in self.active_keys:
+                if "right" in active_keys:
                     lr = self.speed
-                if "up" in self.active_keys:
+                if "up" in active_keys:
                     ud = self.speed
-                if "down" in self.active_keys:
+                if "down" in active_keys:
                     ud = -self.speed
-                if "yaw_left" in self.active_keys:
+                if "yaw_left" in active_keys:
                     yaw = -self.speed
-                if "yaw_right" in self.active_keys:
+                if "yaw_right" in active_keys:
                     yaw = self.speed
 
                 if any([lr, fb, ud, yaw]):
@@ -354,5 +406,5 @@ class TelloController:
 
                 time.sleep(0.05)
 
-        control_thread = threading.Thread(target=control_loop, daemon=True)
-        control_thread.start()
+        self._control_thread = threading.Thread(target=control_loop, daemon=True)
+        self._control_thread.start()

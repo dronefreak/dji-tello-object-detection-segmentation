@@ -10,6 +10,7 @@ This is a starting point for self-driving car concepts applied to drones:
 
 import time
 from collections import deque
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -20,8 +21,69 @@ from tello_vision.tello_controller import TelloController
 from tello_vision.visualizer import Visualizer
 
 
+class PIDController:
+    """A standard PID controller with output clamping and anti-windup.
+
+    Anti-windup is implemented by clamping the accumulated integral term
+    to ``integral_limit`` so a persistently large error (e.g. the target
+    briefly leaving the frame) can't cause the integral term to grow
+    unbounded and produce a large control overshoot once the error is
+    corrected.
+    """
+
+    def __init__(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        output_limit: float,
+        integral_limit: Optional[float] = None,
+    ):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.output_limit = output_limit
+        self.integral_limit = (
+            integral_limit if integral_limit is not None else output_limit
+        )
+
+        self._integral = 0.0
+        self._prev_error = 0.0
+        self._prev_time = None
+
+    def reset(self) -> None:
+        """Reset accumulated state (integral/derivative history)."""
+        self._integral = 0.0
+        self._prev_error = 0.0
+        self._prev_time = None
+
+    def update(self, error: float) -> float:
+        """Compute the next control output for the given error.
+
+        Args:
+            error: Current error (setpoint - measured value).
+
+        Returns:
+            Control output, clamped to +/- output_limit.
+        """
+        now = time.time()
+        dt = now - self._prev_time if self._prev_time is not None else 0.0
+        self._prev_time = now
+
+        self._integral += error * dt
+        self._integral = float(
+            np.clip(self._integral, -self.integral_limit, self.integral_limit)
+        )
+
+        derivative = (error - self._prev_error) / dt if dt > 0 else 0.0
+        self._prev_error = error
+
+        output = self.kp * error + self.ki * self._integral + self.kd * derivative
+        return float(np.clip(output, -self.output_limit, self.output_limit))
+
+
 class ObjectFollower:
-    """Simple PID-based object follower.
+    """PID-based object follower.
 
     Keeps the target object centered in frame.
     """
@@ -29,14 +91,18 @@ class ObjectFollower:
     def __init__(self, target_class: str = "person"):
         self.target_class = target_class
 
-        # PID parameters (tune these)
-        self.kp_yaw = 0.5
-        self.kp_forward = 0.3
-        self.kp_vertical = 0.4
+        # PID controllers for yaw (horizontal centering) and vertical
+        # (up/down centering). Gains are tuned conservatively; adjust as
+        # needed for your drone/environment.
+        self.pid_yaw = PIDController(kp=0.5, ki=0.05, kd=0.1, output_limit=50)
+        self.pid_vertical = PIDController(kp=0.4, ki=0.02, kd=0.08, output_limit=30)
 
+        # Forward/backward is distance-based (bang-bang on bbox area)
+        # rather than PID, since we don't have a continuous depth signal.
         # Target area thresholds
         self.min_area = 5000  # Too far, move forward
         self.max_area = 50000  # Too close, move back
+        self.forward_speed = 20
 
         # Tracking state
         self.target_history = deque(maxlen=5)  # Smooth tracking
@@ -70,20 +136,18 @@ class ObjectFollower:
         error_y = center_y - target_y  # Inverted (down is positive)
 
         # Yaw control (keep centered horizontally)
-        yaw = int(self.kp_yaw * error_x / w * 100)
-        yaw = np.clip(yaw, -50, 50)
+        yaw = int(self.pid_yaw.update(error_x / w * 100))
 
         # Forward/backward control (maintain distance)
         if target_area < self.min_area:
-            fb = 20  # Move forward
+            fb = self.forward_speed  # Move forward
         elif target_area > self.max_area:
-            fb = -20  # Move back
+            fb = -self.forward_speed  # Move back
         else:
             fb = 0
 
         # Vertical control (keep centered vertically)
-        ud = int(self.kp_vertical * error_y / h * 100)
-        ud = np.clip(ud, -30, 30)
+        ud = int(self.pid_vertical.update(error_y / h * 100))
 
         # No left/right movement (use yaw instead)
         lr = 0
@@ -124,6 +188,10 @@ class ObjectFollower:
 
             if self.lost_frames > self.max_lost_frames:
                 self.target_history.clear()
+                # Reset PID state so stale integral/derivative history
+                # doesn't cause a control spike when the target reappears.
+                self.pid_yaw.reset()
+                self.pid_vertical.reset()
 
             return None, None
 

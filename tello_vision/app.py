@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 import yaml
 
+from .config_validator import ConfigError, validate_config
 from .detectors.base_detector import BaseDetector
 from .tello_controller import TelloController
 from .visualizer import Visualizer
@@ -31,10 +32,16 @@ class TelloVisionApp:
             config_path: Path to configuration file
             no_drone: If True, run without connecting to a real drone, using
                 the local webcam as the video source instead (test mode).
+
+        Raises:
+            ConfigError: If the configuration file is missing required
+                sections or keys.
         """
         # Load configuration
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
+
+        validate_config(self.config)
 
         self.no_drone = no_drone
 
@@ -286,7 +293,11 @@ def main():
     args = parser.parse_args()
 
     # Create and run app
-    app = TelloVisionApp(args.config, no_drone=args.no_drone)
+    try:
+        app = TelloVisionApp(args.config, no_drone=args.no_drone)
+    except ConfigError as e:
+        print(f"Configuration error: {e}")
+        raise SystemExit(1)
 
     if app.initialize():
         app.run()
