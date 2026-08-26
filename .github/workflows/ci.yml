@@ -60,22 +60,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black flake8 pep8-naming isort docformatter ruff mypy
+          pip install ruff mypy
 
-      - name: Run black
-        run: black --check --diff tello_vision/ tests/ examples/
-
-      - name: Run flake8
-        run: flake8 tello_vision/ tests/ examples/ --count --select=E9,F63,F7,F82 --show-source --statistics
-
-      - name: Run isort
-        run: isort --check-only --diff tello_vision/ tests/ examples/
-
-      - name: Run docformatter
-        run: docformatter --check --recursive tello_vision/ tests/ examples/
-
-      - name: Run ruff
+      - name: Run ruff check
         run: ruff check tello_vision/ tests/ examples/
+
+      - name: Run ruff format check
+        run: ruff format --check --diff tello_vision/ tests/ examples/
 
       - name: Run mypy (non-blocking)
         run: mypy tello_vision/ || true

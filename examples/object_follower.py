@@ -1,5 +1,6 @@
 """
 Example: Object tracking and following with Tello.
+
 Demonstrates autonomous behavior - drone follows a detected person.
 
 This is a starting point for self-driving car concepts applied to drones:
@@ -10,19 +11,28 @@ This is a starting point for self-driving car concepts applied to drones:
 
 import time
 from collections import deque
+from dataclasses import dataclass
 from typing import Optional
 
 import cv2
 import numpy as np
 import yaml
-
 from tello_vision.detectors.base_detector import BaseDetector
 from tello_vision.tello_controller import TelloController
 from tello_vision.visualizer import Visualizer
 
+# Number of recent target positions to average for jitter smoothing.
+SMOOTHING_WINDOW = 3
+
+# cv2.waitKey() key codes used for interactive controls.
+KEY_TAB = 9
+KEY_BACKSPACE = 8
+KEY_ESC = 27
+
 
 class PIDController:
-    """A standard PID controller with output clamping and anti-windup.
+    """
+    A standard PID controller with output clamping and anti-windup.
 
     Anti-windup is implemented by clamping the accumulated integral term
     to ``integral_limit`` so a persistently large error (e.g. the target
@@ -39,6 +49,18 @@ class PIDController:
         output_limit: float,
         integral_limit: Optional[float] = None,
     ):
+        """
+        Initialize the PID controller with gains and output limits.
+
+        Args:
+            kp: Proportional gain.
+            ki: Integral gain.
+            kd: Derivative gain.
+            output_limit: Maximum absolute output value.
+            integral_limit: Maximum absolute accumulated integral, used to
+                clamp anti-windup. Defaults to output_limit if not given.
+
+        """
         self.kp = kp
         self.ki = ki
         self.kd = kd
@@ -58,13 +80,15 @@ class PIDController:
         self._prev_time = None
 
     def update(self, error: float) -> float:
-        """Compute the next control output for the given error.
+        """
+        Compute the next control output for the given error.
 
         Args:
             error: Current error (setpoint - measured value).
 
         Returns:
             Control output, clamped to +/- output_limit.
+
         """
         now = time.time()
         dt = now - self._prev_time if self._prev_time is not None else 0.0
@@ -83,12 +107,20 @@ class PIDController:
 
 
 class ObjectFollower:
-    """PID-based object follower.
+    """
+    PID-based object follower.
 
     Keeps the target object centered in frame.
     """
 
     def __init__(self, target_class: str = "person"):
+        """
+        Initialize the follower for a given target detection class.
+
+        Args:
+            target_class: Class name of the object to follow (e.g. "person").
+
+        """
         self.target_class = target_class
 
         # PID controllers for yaw (horizontal centering) and vertical
@@ -120,10 +152,12 @@ class ObjectFollower:
         return max(candidates, key=lambda d: d.area)
 
     def calculate_control(self, target, frame_shape):
-        """Calculate control commands based on target position.
+        """
+        Calculate control commands based on target position.
 
         Returns:
             (lr, fb, ud, yaw) control values
+
         """
         h, w = frame_shape[:2]
         center_x, center_y = w // 2, h // 2
@@ -155,10 +189,12 @@ class ObjectFollower:
         return lr, fb, ud, yaw
 
     def update(self, result, frame_shape):
-        """Update tracking and return control commands.
+        """
+        Update tracking and return control commands.
 
         Returns:
             (lr, fb, ud, yaw) or None if target lost
+
         """
         target = self.find_target(result, frame_shape)
 
@@ -169,7 +205,7 @@ class ObjectFollower:
             # Use smoothed position to reduce jitter in the control loop.
             # Average the recent detection centers, then re-center the
             # current bbox on that smoothed point (keeping its size).
-            if len(self.target_history) >= 3:
+            if len(self.target_history) >= SMOOTHING_WINDOW:
                 smoothed_cx, smoothed_cy = np.mean(
                     [t.center for t in self.target_history], axis=0
                 ).astype(int)
@@ -196,12 +232,17 @@ class ObjectFollower:
             return None, None
 
 
-def main():
-    # Load config
+def _initialize():
+    """
+    Load config and construct drone/detector/visualizer components.
+
+    Returns:
+        Tuple of (drone, detector, visualizer, target_class).
+
+    """
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    # Initialize components
     print("Initializing...")
     drone = TelloController(config["drone"])
 
@@ -213,14 +254,105 @@ def main():
 
     visualizer = Visualizer(config["visualization"])
 
-    # Initialize follower
     target_class = input("Enter target class to follow (default: person): ").strip()
     if not target_class:
         target_class = "person"
 
+    return drone, detector, visualizer, target_class
+
+
+def _handle_key(key: int, drone: TelloController, auto_follow: bool) -> tuple:
+    """
+    Handle a single keypress from the main loop.
+
+    Args:
+        key: Key code from cv2.waitKey().
+        drone: Active drone controller.
+        auto_follow: Current auto-follow state.
+
+    Returns:
+        (new_auto_follow, should_quit) tuple.
+
+    """
+    if key == KEY_TAB:
+        if not auto_follow:
+            drone.takeoff()
+            time.sleep(3)  # Wait for stable hover
+            auto_follow = True
+            print("Auto-follow ENABLED")
+    elif key == KEY_BACKSPACE:
+        if auto_follow:
+            auto_follow = False
+            drone.send_rc_control(0, 0, 0, 0)  # Stop movement
+            drone.land()
+            print("Auto-follow DISABLED")
+    elif key == KEY_ESC:
+        drone.emergency()
+        return auto_follow, True
+    elif key == ord("p"):
+        return auto_follow, True
+
+    return auto_follow, False
+
+
+@dataclass
+class FrameState:
+    """Per-frame control/tracking context passed to `_draw_frame`."""
+
+    control: Optional[tuple]
+    target: Optional[object]
+    auto_follow: bool
+    follower: "ObjectFollower"
+    target_class: str
+
+
+def _draw_frame(visualizer, frame, result, frame_state):
+    """
+    Draw detections, tracking indicator, and status overlays on a frame.
+
+    Args:
+        visualizer: Visualizer instance.
+        frame: Current video frame.
+        result: Detection result for this frame.
+        frame_state: FrameState with the current control/tracking context.
+
+    Returns:
+        The annotated frame.
+
+    """
+    control = frame_state.control
+    target = frame_state.target
+    auto_follow = frame_state.auto_follow
+    follower = frame_state.follower
+    target_class = frame_state.target_class
+
+    if auto_follow and control and target:
+        cx, cy = target.center
+        cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 3)
+        cv2.line(frame, (cx - 20, cy), (cx + 20, cy), (0, 255, 0), 2)
+        cv2.line(frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 2)
+
+    frame = visualizer.draw_detections(frame, result)
+
+    status = [
+        f"Auto-Follow: {'ON' if auto_follow else 'OFF'}",
+        f"Target: {target_class}",
+        f"Tracking: {'YES' if control else 'NO'}",
+        f"Lost Frames: {follower.lost_frames}",
+    ]
+    if control:
+        lr, fb, ud, yaw = control
+        status.extend([f"LR: {lr:+3d}  FB: {fb:+3d}", f"UD: {ud:+3d}  YAW: {yaw:+3d}"])
+
+    frame = visualizer.draw_stats(frame, status)
+    return visualizer.draw_crosshair(frame)
+
+
+def main():
+    """Run the interactive object-following demo."""
+    drone, detector, visualizer, target_class = _initialize()
     follower = ObjectFollower(target_class=target_class)
 
-    # Connect to drone
     if not drone.connect():
         print("Failed to connect to drone")
         return
@@ -240,76 +372,28 @@ def main():
 
     try:
         while True:
-            # Get frame
             frame = drone.get_frame()
             if frame is None:
                 continue
 
-            # Run detection
             result = detector.detect(frame)
-
-            # Update follower
             control, target = follower.update(result, frame.shape)
 
-            # Execute control if auto-follow enabled
             if auto_follow and control:
                 lr, fb, ud, yaw = control
                 drone.send_rc_control(lr, fb, ud, yaw)
 
-                # Draw target indicator
-                if target:
-                    cx, cy = target.center
-                    cv2.circle(frame, (cx, cy), 10, (0, 255, 0), 3)
-                    cv2.line(frame, (cx - 20, cy), (cx + 20, cy), (0, 255, 0), 2)
-                    cv2.line(frame, (cx, cy - 20), (cx, cy + 20), (0, 255, 0), 2)
-
-            # Visualize
-            frame = visualizer.draw_detections(frame, result)
-
-            # Draw status
-            status = [
-                f"Auto-Follow: {'ON' if auto_follow else 'OFF'}",
-                f"Target: {target_class}",
-                f"Tracking: {'YES' if control else 'NO'}",
-                f"Lost Frames: {follower.lost_frames}",
-            ]
-
-            if control:
-                lr, fb, ud, yaw = control
-                status.extend(
-                    [f"LR: {lr:+3d}  FB: {fb:+3d}", f"UD: {ud:+3d}  YAW: {yaw:+3d}"]
-                )
-
-            frame = visualizer.draw_stats(frame, status)
-
-            # Draw crosshair
-            frame = visualizer.draw_crosshair(frame)
-
-            # Display
+            frame = _draw_frame(
+                visualizer,
+                frame,
+                result,
+                FrameState(control, target, auto_follow, follower, target_class),
+            )
             cv2.imshow("Object Following", frame)
 
-            # Handle keys
             key = cv2.waitKey(1) & 0xFF
-
-            if key == 9:  # TAB
-                if not auto_follow:
-                    drone.takeoff()
-                    time.sleep(3)  # Wait for stable hover
-                    auto_follow = True
-                    print("Auto-follow ENABLED")
-
-            elif key == 8:  # BACKSPACE
-                if auto_follow:
-                    auto_follow = False
-                    drone.send_rc_control(0, 0, 0, 0)  # Stop movement
-                    drone.land()
-                    print("Auto-follow DISABLED")
-
-            elif key == 27:  # ESC
-                drone.emergency()
-                break
-
-            elif key == ord("p"):
+            auto_follow, should_quit = _handle_key(key, drone, auto_follow)
+            if should_quit:
                 break
 
     except KeyboardInterrupt:

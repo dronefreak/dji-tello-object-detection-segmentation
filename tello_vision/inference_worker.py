@@ -1,4 +1,5 @@
-"""Asynchronous inference worker.
+"""
+Asynchronous inference worker.
 
 Decouples frame capture/display from model inference by running detection on a dedicated
 background thread. The main loop can keep grabbing and displaying frames at full speed
@@ -21,7 +22,8 @@ QUEUE_POLL_TIMEOUT = 0.1
 
 
 class AsyncInferenceWorker:
-    """Runs detector inference on a background thread.
+    """
+    Runs detector inference on a background thread.
 
     Frames are submitted via `submit_frame()`. If the internal queue is full (the worker
     hasn't kept up), the oldest queued frame is dropped in favor of the newest one,
@@ -30,13 +32,15 @@ class AsyncInferenceWorker:
     """
 
     def __init__(self, detector: BaseDetector, max_queue_size: int = 1):
-        """Initialize the worker.
+        """
+        Initialize the worker.
 
         Args:
             detector: Detector instance to run inference with. Must already
                 be loaded (load_model()/warmup() called) before start().
             max_queue_size: Maximum number of frames buffered for
                 inference before older frames start being dropped.
+
         """
         self.detector = detector
         self._input_queue: "queue.Queue[np.ndarray]" = queue.Queue(
@@ -64,10 +68,12 @@ class AsyncInferenceWorker:
         self._thread.start()
 
     def stop(self, timeout: float = 2.0) -> None:
-        """Signal the worker to stop and wait for it to exit.
+        """
+        Signal the worker to stop and wait for it to exit.
 
         Args:
             timeout: Max seconds to wait for the thread to finish.
+
         """
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
@@ -75,10 +81,12 @@ class AsyncInferenceWorker:
         self._thread = None
 
     def submit_frame(self, frame: np.ndarray) -> None:
-        """Submit a frame for inference, dropping the oldest if the queue is full.
+        """
+        Submit a frame for inference, dropping the oldest if the queue is full.
 
         Args:
             frame: Frame to run detection on.
+
         """
         try:
             self._input_queue.put_nowait(frame)
@@ -95,11 +103,13 @@ class AsyncInferenceWorker:
                 pass  # Another thread raced us; safe to drop this frame.
 
     def get_latest_result(self) -> Optional[DetectionResult]:
-        """Get the most recently completed detection result, if any.
+        """
+        Get the most recently completed detection result, if any.
 
         Returns:
             The latest DetectionResult, or None if inference hasn't
             produced a result yet (e.g. still warming up).
+
         """
         with self._result_lock:
             return self._latest_result

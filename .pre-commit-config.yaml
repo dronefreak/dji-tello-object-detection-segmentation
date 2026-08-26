@@ -1,31 +1,17 @@
 # Note: pre-commit ignores anything already ignored by Git.
 repos:
-  # 1. isort first
-  - repo: https://github.com/timothycrosley/isort
-    rev: 5.12.0
+  # 1. Ruff: lint + format + import-sort + docstring checks (replaces
+  # isort, black, flake8, pep8-naming, docformatter)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
     hooks:
-      - id: isort
-        language_version: python
-        additional_dependencies: ["isort[colors]==5.12.0"]
-        args: ["--profile", "black"]
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
 
-  # 2. black second
-  - repo: https://github.com/ambv/black
-    rev: 25.1.0
-    hooks:
-      - id: black
-        language_version: python
-        args: ["--line-length", "88"]
-
-  # 3. flake8 linting
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
-    hooks:
-      - id: flake8
-        language_version: python
-        additional_dependencies: ["pep8-naming==0.12.1"]
-
-  # 4. pre-commit hooks for safety
+  # 2. pre-commit hooks for safety
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -40,21 +26,14 @@ repos:
       - id: check-yaml
       - id: detect-private-key
 
-  # 5. docformatter for docstrings
-  - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.7
-    hooks:
-      - id: docformatter
-        args: [--in-place, --wrap-summaries=88, --wrap-descriptions=88]
-
-  # 6. prettier for markdown/yaml/json/xml/toml
+  # 3. prettier for markdown/yaml/json/xml/toml
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         types_or: [markdown, yaml, json, xml, toml]
 
-  # 7. clang-format for C/C++ files
+  # 4. clang-format for C/C++ files
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v16.0.6
     hooks:

@@ -1,4 +1,5 @@
-"""Main application for Tello Vision.
+"""
+Main application for Tello Vision.
 
 Integrates drone control, detection, and visualization.
 """
@@ -22,12 +23,17 @@ from .visualizer import Visualizer
 # busy-spinning a CPU core while waiting for the video stream to recover.
 NO_FRAME_RETRY_DELAY = 0.01
 
+# cv2.waitKey() key codes used for interactive controls.
+KEY_ESC = 27
+KEY_ENTER = 13
+
 
 class TelloVisionApp:
     """Main application for Tello drone with vision capabilities."""
 
     def __init__(self, config_path: str = "config.yaml", no_drone: bool = False):
-        """Initialize application.
+        """
+        Initialize application.
 
         Args:
             config_path: Path to configuration file
@@ -37,6 +43,7 @@ class TelloVisionApp:
         Raises:
             ConfigError: If the configuration file is missing required
                 sections or keys.
+
         """
         # Load configuration
         with open(config_path, "r") as f:
@@ -87,10 +94,12 @@ class TelloVisionApp:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def initialize(self) -> bool:
-        """Initialize all components.
+        """
+        Initialize all components.
 
         Returns:
             True if initialization successful
+
         """
         print("=" * 50)
         print("Tello Vision - Modern Instance Segmentation")
@@ -134,13 +143,15 @@ class TelloVisionApp:
         return True
 
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Process a single frame with detection and visualization.
+        """
+        Process a single frame with detection and visualization.
 
         Args:
             frame: Input frame from drone
 
         Returns:
             Processed frame with visualizations
+
         """
         # Skip frames if configured
         frame_skip = self.processing_config.get("frame_skip", 0)
@@ -204,12 +215,14 @@ class TelloVisionApp:
             self.drone.update_stats()
 
     def get_frame(self) -> Optional[np.ndarray]:
-        """Get the next video frame from the active source.
+        """
+        Get the next video frame from the active source.
 
         Returns:
             Frame as numpy array (BGR), or None if unavailable. In
             --no-drone mode, frames come from the local webcam instead of
             the drone's video stream.
+
         """
         if self.no_drone:
             if self.video_capture is None or not self.video_capture.isOpened():
@@ -257,11 +270,11 @@ class TelloVisionApp:
 
                 # Check for quit
                 key = cv2.waitKey(1) & 0xFF
-                if key == ord("p") or key == 27:  # 'p' or ESC
+                if key == ord("p") or key == KEY_ESC:  # 'p' or ESC
                     break
                 elif key == ord("r"):
                     self.toggle_recording()
-                elif key == 13:  # Enter
+                elif key == KEY_ENTER:  # Enter
                     self.take_photo(processed_frame)
 
         except KeyboardInterrupt:
@@ -308,7 +321,7 @@ class TelloVisionApp:
 
 
 def main():
-    """Main entry point."""
+    """Run the main entry point."""
     parser = argparse.ArgumentParser(
         description="Tello Vision - Modern instance segmentation for DJI Tello"
     )
@@ -328,7 +341,7 @@ def main():
         app = TelloVisionApp(args.config, no_drone=args.no_drone)
     except ConfigError as e:
         print(f"Configuration error: {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from e
 
     if app.initialize():
         app.run()

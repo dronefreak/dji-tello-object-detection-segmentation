@@ -4,7 +4,6 @@ import time
 from unittest.mock import Mock
 
 import numpy as np
-
 from tello_vision.detectors.base_detector import DetectionResult
 from tello_vision.inference_worker import AsyncInferenceWorker
 

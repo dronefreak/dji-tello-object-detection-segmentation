@@ -1,7 +1,6 @@
 """Tests for base detector functionality."""
 
 import pytest
-
 from tello_vision.detectors.base_detector import (
     BaseDetector,
     Detection,
