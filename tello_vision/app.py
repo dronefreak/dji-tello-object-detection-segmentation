@@ -6,6 +6,7 @@ Integrates drone control, detection, and visualization.
 import argparse
 import time
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -15,22 +16,33 @@ from .detectors.base_detector import BaseDetector
 from .tello_controller import TelloController
 from .visualizer import Visualizer
 
+# Delay (seconds) between retries when no frame is available, to avoid
+# busy-spinning a CPU core while waiting for the video stream to recover.
+NO_FRAME_RETRY_DELAY = 0.01
+
 
 class TelloVisionApp:
     """Main application for Tello drone with vision capabilities."""
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml", no_drone: bool = False):
         """Initialize application.
 
         Args:
             config_path: Path to configuration file
+            no_drone: If True, run without connecting to a real drone, using
+                the local webcam as the video source instead (test mode).
         """
         # Load configuration
         with open(config_path, "r") as f:
             self.config = yaml.safe_load(f)
 
+        self.no_drone = no_drone
+
         # Initialize components
         self.drone = TelloController(self.config["drone"])
+
+        # Video capture used in place of the drone stream in --no-drone mode
+        self.video_capture: Optional[cv2.VideoCapture] = None
 
         # Initialize detector
         detector_config = self.config["detector"]
@@ -69,6 +81,18 @@ class TelloVisionApp:
         print("\n[1/3] Loading detection model...")
         self.detector.load_model()
         self.detector.warmup()
+
+        if self.no_drone:
+            # Test mode: use the local webcam instead of a real drone
+            print("\n[2/3] Running in --no-drone test mode (using webcam)...")
+            self.video_capture = cv2.VideoCapture(0)
+            if not self.video_capture.isOpened():
+                print("Failed to open webcam for --no-drone mode!")
+                return False
+
+            print("\n[3/3] Skipping drone connection and keyboard controls")
+            print("\n✓ Initialization complete!")
+            return True
 
         # Connect to drone
         print("\n[2/3] Connecting to drone...")
@@ -144,13 +168,32 @@ class TelloVisionApp:
             # Update drone stats
             self.drone.update_stats()
 
+    def get_frame(self) -> Optional[np.ndarray]:
+        """Get the next video frame from the active source.
+
+        Returns:
+            Frame as numpy array (BGR), or None if unavailable. In
+            --no-drone mode, frames come from the local webcam instead of
+            the drone's video stream.
+        """
+        if self.no_drone:
+            if self.video_capture is None or not self.video_capture.isOpened():
+                return None
+            ret, frame = self.video_capture.read()
+            return frame if ret else None
+
+        return self.drone.get_frame()
+
     def run(self) -> None:
         """Run the main application loop."""
         self.running = True
 
         print("\n" + "=" * 50)
         print("Starting video stream...")
-        print("Press 'tab' to takeoff, 'backspace' to land")
+        if self.no_drone:
+            print("Running in --no-drone test mode")
+        else:
+            print("Press 'tab' to takeoff, 'backspace' to land")
         print("Press 'p' to quit")
         print("=" * 50 + "\n")
 
@@ -158,10 +201,13 @@ class TelloVisionApp:
 
         try:
             while self.running:
-                # Get frame from drone
-                frame = self.drone.get_frame()
+                # Get frame from the active video source
+                frame = self.get_frame()
 
                 if frame is None:
+                    # Avoid busy-spinning a CPU core while waiting for a
+                    # frame to become available (e.g. dropped connection).
+                    time.sleep(NO_FRAME_RETRY_DELAY)
                     continue
 
                 # Process frame
@@ -212,7 +258,13 @@ class TelloVisionApp:
 
         # Cleanup
         cv2.destroyAllWindows()
-        self.drone.disconnect()
+
+        if self.no_drone:
+            if self.video_capture is not None:
+                self.video_capture.release()
+                self.video_capture = None
+        else:
+            self.drone.disconnect()
 
         print("Shutdown complete")
 
@@ -228,13 +280,13 @@ def main():
     parser.add_argument(
         "--no-drone",
         action="store_true",
-        help="Run without connecting to drone (test mode)",
+        help="Run without connecting to drone, using the webcam instead (test mode)",
     )
 
     args = parser.parse_args()
 
     # Create and run app
-    app = TelloVisionApp(args.config)
+    app = TelloVisionApp(args.config, no_drone=args.no_drone)
 
     if app.initialize():
         app.run()

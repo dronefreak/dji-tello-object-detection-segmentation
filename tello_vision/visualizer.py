@@ -1,7 +1,7 @@
 """Visualization utilities for rendering detection results on frames."""
 
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -185,7 +185,7 @@ class Visualizer:
         return frame
 
     def draw_fps(
-        self, frame: np.ndarray, fps: float, position: Tuple[int, int] = None
+        self, frame: np.ndarray, fps: float, position: Optional[Tuple[int, int]] = None
     ) -> np.ndarray:
         """Draw FPS counter on frame.
 
