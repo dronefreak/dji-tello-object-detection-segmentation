@@ -4,7 +4,7 @@ Modern, modular instance segmentation and object detection for DJI Tello drones.
 
 ![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
-![License: MIT](https://img.shields.io/badge/License-Apache-yellow.svg)
+![License: Apache-2.0](https://img.shields.io/badge/License-Apache-yellow.svg)
 ![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
 
 ## 📖 Documentation Index
@@ -33,7 +33,7 @@ Modern, modular instance segmentation and object detection for DJI Tello drones.
 ```bash
 # Clone the repo
 git clone https://github.com/dronefreak/dji-tello-object-detection-segmentation
-cd tello_vision
+cd dji-tello-object-detection-segmentation
 
 # Create virtual environment
 python3.10 -m venv venv
@@ -53,44 +53,21 @@ pip install -e ".[yolo]"
 pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ```
 
-### 2. Test Detection Without Drone
-
-Good for verifying everything works:
+### 2. Run It
 
 ```bash
-python examples/test_detector.py --source 0  # Webcam
-```
+# Test without a drone first (webcam)
+python examples/test_detector.py --source 0
 
-### 3. Benchmark Your Setup
-
-See what FPS you can get:
-
-```bash
-python examples/benchmark.py
-```
-
-### 4. Configure
-
-Edit `config.yaml`:
-
-```yaml
-detector:
-  backend: "yolov8" # or "detectron2"
-  yolov8:
-    model: "yolov8n-seg.pt" # nano = fastest
-    confidence: 0.5
-    device: "cuda" # or "cpu"
-```
-
-### 5. Test Detection With Drone
-
-```bash
-# Make sure your Tello is powered on and connected to its WiFi
+# With a Tello: power it on, connect to its WiFi, then
 python -m tello_vision.app
 
 # With custom config
 python -m tello_vision.app --config my_config.yaml
 ```
+
+See [QUICKSTART.md](QUICKSTART.md) for benchmarking, config tweaks, and
+the autonomous-follow demo.
 
 ### Controls
 
@@ -157,43 +134,9 @@ def create_detector(backend: str, config: dict):
 
 _FPS measured at 960x720 resolution_
 
-## Configuration Guide
-
-### Target Specific Objects
-
-```yaml
-detector:
-  target_classes: ["person", "car", "dog"] # Only detect these
-```
-
-### Adjust Visualization
-
-```yaml
-visualization:
-  show_masks: true
-  mask_alpha: 0.4 # Transparency
-  show_boxes: true
-  box_thickness: 2
-  show_confidence: true
-```
-
-### Performance Tuning
-
-```yaml
-processing:
-  frame_skip: 1 # Process every 2nd frame (doubles FPS)
-  async_inference: true # Run detection in separate thread
-  max_queue_size: 3
-```
-
-### Recording
-
-```yaml
-processing:
-  record_video: false # Auto-start recording
-  output_dir: "./output"
-  video_codec: "mp4v"
-```
+All settings (detection, visualization, performance, recording) live in
+`config.yaml`, which is commented inline; see
+[QUICKSTART.md](QUICKSTART.md#configuration-tweaks) for common tweaks.
 
 ## Advanced Usage
 
@@ -233,46 +176,6 @@ while True:
     frame = visualizer.draw_detections(frame, result)
 ```
 
-## Self-Driving Car Extensions
-
-Since you're exploring autonomous vehicles, here are some ideas:
-
-### 1. Object Tracking
-
-Add a tracker to follow specific objects:
-
-```python
-# Use ByteTrack or SORT
-from boxmot import ByteTrack
-
-tracker = ByteTrack()
-tracks = tracker.update(detections, frame)
-```
-
-### 2. Path Planning
-
-Integrate with planning algorithms:
-
-```python
-if 'person' in detected_classes:
-    drone.move_left(30)  # Avoid obstacle
-```
-
-### 3. SLAM Integration
-
-Connect with ORB-SLAM or similar:
-
-```python
-from orbslam3 import System
-
-slam = System('vocab.txt', 'tello.yaml')
-pose = slam.process_image_mono(frame, timestamp)
-```
-
-### 4. Semantic Segmentation
-
-Add depth estimation or semantic maps for better navigation.
-
 ## Troubleshooting
 
 ### Connection Issues
@@ -308,16 +211,19 @@ pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+pip install -e ".[dev,yolo]"
 
-# Format code
-black tello_vision/
+# Install pre-commit hooks (runs all checks below automatically on commit)
+pre-commit install
 
-# Lint
-ruff check tello_vision/
+# Run all checks manually
+pre-commit run --all-files
 
-# Type check
-mypy tello_vision/
+# Individual tools
+ruff check tello_vision/ tests/ examples/
+ruff format tello_vision/ tests/ examples/
+mypy tello_vision/ tests/ examples/ --ignore-missing-imports
+bandit -r tello_vision/ examples/ --confidence-level medium
 ```
 
 ## Roadmap
