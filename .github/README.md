@@ -43,10 +43,14 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[yolo]"
 
 # OR install with Detectron2 (higher quality, slower)
-pip install -e ".[detectron2]"
+# Detectron2 isn't a regular PyPI extra — install the base package first
+# (for torch), then install Detectron2 manually from git:
+pip install -e .
+pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
-# OR both
-pip install -e ".[yolo,detectron2]"
+# OR both YOLOv8 and Detectron2
+pip install -e ".[yolo]"
+pip install 'git+https://github.com/facebookresearch/detectron2.git'
 ```
 
 ### 2. Test Detection Without Drone

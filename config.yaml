@@ -50,8 +50,12 @@ processing:
 
   # Performance optimization
   frame_skip: 0 # Process every Nth frame (0 = process all)
-  async_inference: true # Run detection in separate thread
-  max_queue_size: 3 # Max frames in inference queue
+  # NOTE: async_inference / max_queue_size are reserved for a planned
+  # async inference pipeline (frame queue + worker thread) that is not
+  # yet implemented — detection currently always runs synchronously in
+  # the main render loop, regardless of these values.
+  async_inference: false # Not yet implemented; see project roadmap
+  max_queue_size: 3 # Not yet implemented; see project roadmap
 
   # Recording
   record_video: false
