@@ -229,7 +229,7 @@ jobs:
 
       - name: Run bandit
         run: |
-          bandit -r tello_vision/ -ll -x B311,B322,B101 || true
+          bandit -r tello_vision/ examples/ --confidence-level medium
 
   docs:
     name: Documentation Check
