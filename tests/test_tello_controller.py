@@ -1,10 +1,25 @@
 """Tests for Tello controller functionality."""
 
-from unittest.mock import Mock, patch
+import sys
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 from tello_vision.tello_controller import TelloController
+
+# TelloController imports pynput.keyboard lazily inside
+# setup_keyboard_controls() because pynput's top-level package
+# unconditionally imports both its keyboard and mouse submodules, and
+# both perform X11 backend detection at import time - which raises
+# ImportError on displayless systems (e.g. CI runners). Patching all
+# three into sys.modules before that import runs lets these tests
+# exercise the method without a real display or a real global keyboard
+# hook.
+_FAKE_PYNPUT_KEYBOARD = {
+    "pynput": MagicMock(),
+    "pynput.keyboard": MagicMock(),
+    "pynput.mouse": MagicMock(),
+}
 
 
 class TestTelloController:
@@ -248,7 +263,8 @@ class TestTelloController:
         mock_tello_class.return_value = mock_drone
 
         controller = TelloController(sample_config["drone"])
-        controller.setup_keyboard_controls(sample_config["controls"])
+        with patch.dict(sys.modules, _FAKE_PYNPUT_KEYBOARD):
+            controller.setup_keyboard_controls(sample_config["controls"])
 
         assert controller._control_thread is not None
         assert controller._control_thread.is_alive()
@@ -271,7 +287,8 @@ class TestTelloController:
 
         controller = TelloController(sample_config["drone"])
         controller.start_video_stream()
-        controller.setup_keyboard_controls(sample_config["controls"])
+        with patch.dict(sys.modules, _FAKE_PYNPUT_KEYBOARD):
+            controller.setup_keyboard_controls(sample_config["controls"])
 
         start = time_module.time()
         controller.disconnect()

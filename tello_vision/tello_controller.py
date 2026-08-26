@@ -6,12 +6,18 @@ Handles video streaming, keyboard controls, and flight commands.
 
 import threading
 import time
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import cv2
 import numpy as np
 from djitellopy import Tello
-from pynput import keyboard
+
+if TYPE_CHECKING:
+    # Only needed for type-checking: pynput.keyboard is imported lazily
+    # at runtime (see setup_keyboard_controls()) because it performs X11
+    # backend detection at import time, which raises ImportError on
+    # headless systems (e.g. CI runners) that have no display.
+    from pynput import keyboard
 
 # Actions that map to continuous (held-key) movement, as opposed to the
 # one-shot takeoff/land/emergency actions.
@@ -72,8 +78,8 @@ class TelloController:
         )
 
         # Keyboard listener
-        self.listener: Optional[keyboard.Listener] = None
-        self.active_keys = set()
+        self.listener: Optional["keyboard.Listener"] = None
+        self.active_keys: set = set()
         self._active_keys_lock = threading.Lock()
 
         # Background thread lifecycle management. A single stop event is
@@ -172,7 +178,7 @@ class TelloController:
 
         """
         try:
-            frame = self.drone.get_frame_read().frame
+            frame: Optional[np.ndarray] = self.drone.get_frame_read().frame
             return frame
         except Exception as e:
             print(f"Error getting frame: {e}")
@@ -191,7 +197,7 @@ class TelloController:
         self.frame_callback = callback
         self._stop_event.clear()
 
-        def stream_loop():
+        def stream_loop() -> None:
             while not self._stop_event.is_set():
                 frame = self.get_frame()
                 if frame is not None and self.frame_callback:
@@ -325,7 +331,9 @@ class TelloController:
 
         """
         if not self.is_recording:
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            # cv2-stubs doesn't expose this legacy module-level alias for
+            # cv2.VideoWriter.fourcc, even though it exists at runtime.
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
             self.video_writer = cv2.VideoWriter(output_path, fourcc, fps, resolution)
             self.is_recording = True
             print(f"Recording started: {output_path}")
@@ -383,8 +391,11 @@ class TelloController:
             controls: Dictionary mapping actions to keys
 
         """
+        # Imported lazily (see the TYPE_CHECKING import above): this
+        # requires a real display and is only actually needed here.
+        from pynput import keyboard
 
-        def on_press(key):
+        def on_press(key: Any) -> None:
             try:
                 k = key.char if hasattr(key, "char") else key.name
 
@@ -404,7 +415,7 @@ class TelloController:
             except AttributeError:
                 pass
 
-        def on_release(key):
+        def on_release(key: Any) -> None:
             try:
                 k = key.char if hasattr(key, "char") else key.name
 
@@ -423,7 +434,7 @@ class TelloController:
         self._stop_event.clear()
 
         # Start control loop for continuous movement
-        def control_loop():
+        def control_loop() -> None:
             while not self._stop_event.is_set():
                 with self._active_keys_lock:
                     active_keys = set(self.active_keys)

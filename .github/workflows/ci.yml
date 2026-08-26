@@ -240,8 +240,9 @@ jobs:
 
       - name: Check required documentation
         run: |
-          # Check that all required markdown files exist
-          for file in README.md CODE_OF_CONDUCT.md SECURITY.md; do
+          # These live under .github/ (see pyproject.toml's `readme` key),
+          # not at the repo root.
+          for file in .github/README.md .github/CODE_OF_CONDUCT.md .github/SECURITY.md; do
             if [ ! -f "$file" ]; then
               echo "Missing: $file"
               exit 1
