@@ -102,14 +102,20 @@ class ObjectFollower:
             self.target_history.append(target)
             self.lost_frames = 0
 
-            # Use smoothed position
+            # Use smoothed position to reduce jitter in the control loop.
+            # Average the recent detection centers, then re-center the
+            # current bbox on that smoothed point (keeping its size).
             if len(self.target_history) >= 3:
-                _ = np.mean([t.center for t in self.target_history], axis=0).astype(int)
+                smoothed_cx, smoothed_cy = np.mean(
+                    [t.center for t in self.target_history], axis=0
+                ).astype(int)
+                x1, y1, x2, y2 = target.bbox
+                half_width, half_height = (x2 - x1) // 2, (y2 - y1) // 2
                 target.bbox = (
-                    target.bbox[0],
-                    target.bbox[1],
-                    target.bbox[2],
-                    target.bbox[3],
+                    int(smoothed_cx - half_width),
+                    int(smoothed_cy - half_height),
+                    int(smoothed_cx + half_width),
+                    int(smoothed_cy + half_height),
                 )
 
             return self.calculate_control(target, frame_shape), target

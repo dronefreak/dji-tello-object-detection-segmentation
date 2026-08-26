@@ -2,6 +2,9 @@
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["tello_vision*"]
+
 [project]
 name = "dji-tello-object-detection-segmentation"
 version = "2.0.0"
