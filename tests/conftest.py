@@ -3,6 +3,24 @@
 import numpy as np
 import pytest
 
+# Markers that identify a test as *not* a plain fast unit test. Any test
+# collected without one of these already applied is auto-marked "unit" so
+# CI's `-m "unit and not slow"` selection actually picks up the test suite
+# instead of silently selecting zero tests.
+_NON_UNIT_MARKERS = {"integration", "slow", "drone", "gpu"}
+
+
+def pytest_collection_modifyitems(items):
+    """Auto-mark tests as 'unit' unless they already carry another marker.
+
+    Args:
+        items: Collected pytest test items.
+    """
+    for item in items:
+        existing_markers = {marker.name for marker in item.iter_markers()}
+        if not existing_markers & _NON_UNIT_MARKERS:
+            item.add_marker(pytest.mark.unit)
+
 
 @pytest.fixture
 def sample_frame():
