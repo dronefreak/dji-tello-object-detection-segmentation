@@ -47,7 +47,6 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
-    "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
 ]
@@ -57,26 +56,40 @@ Homepage = "https://github.com/dronefreak/dji-tello-object-detection-segmentatio
 Repository = "https://github.com/dronefreak/dji-tello-object-detection-segmentation"
 Issues = "https://github.com/dronefreak/dji-tello-object-detection-segmentation/issues"
 
-[tool.black]
-line-length = 88
-target-version = ['py310']
-
 [tool.ruff]
 line-length = 88
-select = ["E", "F", "I", "N", "W"]
-ignore = ["E501"]
+target-version = "py310"
+src = ["tello_vision", "examples", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "S", "D", "PLR", "I"]
+extend-ignore = [
+    "E203",   # Black-compatible slice formatting
+    "D203",   # Google style: no blank line before class (keep D211)
+    "D212",   # Google style: multi-line summary on second line (keep D213)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D100", "D101", "D102",  # No docstring requirements in tests
+    "S101",                  # allow assert
+    "S602",                  # shell=True in subprocess (tests only)
+    "PLR2004",               # Magic values in assertions are normal
+    "PLR0913",               # @patch decorators add mock args to signatures
+    "PLR0917",               # Same - too many positional args from @patch
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
-
-[tool.isort]
-profile = "black"
-line_length = 88
-multi_line_output = 3
-include_trailing_comma = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,4 +1,5 @@
-"""Abstract base class for object detection/segmentation models.
+"""
+Abstract base class for object detection/segmentation models.
 
 Allows easy swapping between different backends (YOLOv8, Detectron2, custom).
 """
@@ -61,10 +62,12 @@ class BaseDetector(ABC):
     """Abstract base class for all detectors."""
 
     def __init__(self, config: dict):
-        """Initialize detector with configuration.
+        """
+        Initialize detector with configuration.
 
         Args:
             config: Dictionary containing detector configuration
+
         """
         self.config = config
         self.class_names: List[str] = []
@@ -77,13 +80,15 @@ class BaseDetector(ABC):
 
     @abstractmethod
     def detect(self, frame: np.ndarray) -> DetectionResult:
-        """Run detection on a frame.
+        """
+        Run detection on a frame.
 
         Args:
             frame: Input image as numpy array (H, W, C) in BGR format
 
         Returns:
             DetectionResult containing all detections
+
         """
         pass
 
@@ -93,10 +98,12 @@ class BaseDetector(ABC):
         pass
 
     def warmup(self, num_iterations: int = 3) -> None:
-        """Warmup the model with dummy input. Useful for GPU initialization.
+        """
+        Warmup the model with dummy input. Useful for GPU initialization.
 
         Args:
             num_iterations: Number of warmup iterations
+
         """
         if not self._initialized:
             raise RuntimeError("Model not loaded. Call load_model() first.")
@@ -116,7 +123,8 @@ class BaseDetector(ABC):
 
     @staticmethod
     def create_detector(backend: str, config: dict) -> "BaseDetector":
-        """Factory method to create detector instance.
+        """
+        Create a detector instance for the given backend.
 
         Args:
             backend: Detector backend name ('yolov8', 'detectron2', etc.)
@@ -127,6 +135,7 @@ class BaseDetector(ABC):
 
         Raises:
             ValueError: If backend is not supported
+
         """
         if backend == "yolov8":
             from .yolo_detector import YOLODetector

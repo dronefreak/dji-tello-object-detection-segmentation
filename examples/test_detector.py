@@ -1,5 +1,6 @@
 """
-Example: Basic detection without drone (using webcam or video file)
+Example: Basic detection without drone (using webcam or video file).
+
 Useful for testing detector models without needing the actual drone.
 """
 
@@ -8,12 +9,12 @@ import time
 
 import cv2
 import yaml
-
 from tello_vision.detectors.base_detector import BaseDetector
 from tello_vision.visualizer import Visualizer
 
 
 def main():
+    """Run detection on a webcam or video-file source for quick testing."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source",

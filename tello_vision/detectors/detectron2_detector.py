@@ -1,4 +1,5 @@
-"""Detectron2 detector implementation.
+"""
+Detectron2 detector implementation.
 
 Higher quality but slower than YOLO. Good for precision applications.
 """
@@ -14,6 +15,13 @@ class Detectron2Detector(BaseDetector):
     """Detectron2 Mask R-CNN detector."""
 
     def __init__(self, config: dict):
+        """
+        Initialize the detector with backend-specific configuration.
+
+        Args:
+            config: Detectron2-specific configuration mapping.
+
+        """
         super().__init__(config)
         self.predictor = None
         self.metadata = None
@@ -25,11 +33,11 @@ class Detectron2Detector(BaseDetector):
             from detectron2.config import get_cfg
             from detectron2.data import MetadataCatalog
             from detectron2.engine import DefaultPredictor
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "detectron2 not installed. Install from: "
                 "https://github.com/facebookresearch/detectron2"
-            )
+            ) from e
 
         cfg = get_cfg()
 
@@ -71,13 +79,15 @@ class Detectron2Detector(BaseDetector):
         print(f"Detectron2 model loaded. Classes: {len(self.class_names)}")
 
     def detect(self, frame: np.ndarray) -> DetectionResult:
-        """Run Detectron2 detection on frame.
+        """
+        Run Detectron2 detection on frame.
 
         Args:
             frame: Input image (H, W, C) in BGR format
 
         Returns:
             DetectionResult with all detections
+
         """
         if not self._initialized:
             raise RuntimeError("Model not loaded. Call load_model() first.")

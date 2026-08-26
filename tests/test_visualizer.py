@@ -1,7 +1,6 @@
 """Tests for visualization functionality."""
 
 import numpy as np
-
 from tello_vision.detectors.base_detector import Detection
 from tello_vision.visualizer import Visualizer
 

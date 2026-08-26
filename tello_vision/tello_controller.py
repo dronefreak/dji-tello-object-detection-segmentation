@@ -1,4 +1,5 @@
-"""Modern DJI Tello drone controller using djitellopy.
+"""
+Modern DJI Tello drone controller using djitellopy.
 
 Handles video streaming, keyboard controls, and flight commands.
 """
@@ -39,10 +40,12 @@ class TelloController:
     """Controller for DJI Tello drone with video streaming."""
 
     def __init__(self, config: dict):
-        """Initialize Tello controller.
+        """
+        Initialize Tello controller.
 
         Args:
             config: Configuration dictionary
+
         """
         self.config = config
         self.drone = Tello()
@@ -81,7 +84,8 @@ class TelloController:
         self._control_thread: Optional[threading.Thread] = None
 
     def connect(self) -> bool:
-        """Connect to the Tello drone, retrying transient failures.
+        """
+        Connect to the Tello drone, retrying transient failures.
 
         Tello WiFi connections are commonly flaky, so this retries with
         exponential backoff (configurable via ``connect_retries`` and
@@ -90,6 +94,7 @@ class TelloController:
 
         Returns:
             True if connection successful
+
         """
         attempts = max(1, self.connect_retries)
         delay = self.connect_retry_delay
@@ -104,8 +109,7 @@ class TelloController:
                 self.temperature = self.drone.get_temperature()
 
                 print(
-                    f"Connected! Battery: {self.battery}%, "
-                    f"Temp: {self.temperature}°C"
+                    f"Connected! Battery: {self.battery}%, Temp: {self.temperature}°C"
                 )
 
                 # Start video stream
@@ -160,10 +164,12 @@ class TelloController:
         print("Disconnected")
 
     def get_frame(self) -> Optional[np.ndarray]:
-        """Get current video frame from drone.
+        """
+        Get current video frame from drone.
 
         Returns:
             Frame as numpy array (BGR) or None if unavailable
+
         """
         try:
             frame = self.drone.get_frame_read().frame
@@ -175,10 +181,12 @@ class TelloController:
     def start_video_stream(
         self, callback: Optional[Callable[[np.ndarray], None]] = None
     ) -> None:
-        """Start processing video stream.
+        """
+        Start processing video stream.
 
         Args:
             callback: Optional callback function to process each frame
+
         """
         self.frame_callback = callback
         self._stop_event.clear()
@@ -264,13 +272,15 @@ class TelloController:
         up_down: int = 0,
         yaw: int = 0,
     ) -> None:
-        """Send RC control command for smooth movement.
+        """
+        Send RC control command for smooth movement.
 
         Args:
             left_right: -100 to 100 (left to right)
             forward_backward: -100 to 100 (backward to forward)
             up_down: -100 to 100 (down to up)
             yaw: -100 to 100 (CCW to CW)
+
         """
         if self.is_flying:
             self.drone.send_rc_control(left_right, forward_backward, up_down, yaw)
@@ -286,10 +296,12 @@ class TelloController:
             print(f"Error updating stats: {e}")
 
     def get_stats_text(self) -> list:
-        """Get formatted stats text for display.
+        """
+        Get formatted stats text for display.
 
         Returns:
             List of stat strings
+
         """
         return [
             f"Battery: {self.battery}%",
@@ -303,12 +315,14 @@ class TelloController:
     def start_recording(
         self, output_path: str, fps: int = 30, resolution: tuple = (960, 720)
     ) -> None:
-        """Start recording video.
+        """
+        Start recording video.
 
         Args:
             output_path: Output file path
             fps: Frames per second
             resolution: Video resolution (width, height)
+
         """
         if not self.is_recording:
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -329,11 +343,45 @@ class TelloController:
         if self.is_recording and self.video_writer:
             self.video_writer.write(frame)
 
+    def _compute_rc_vector_from_keys(self, active_keys: set) -> tuple:
+        """
+        Translate currently-held movement keys into an RC control vector.
+
+        Args:
+            active_keys: Set of currently active movement action names.
+
+        Returns:
+            (lr, fb, ud, yaw) RC control values.
+
+        """
+        lr = fb = ud = yaw = 0
+
+        if "forward" in active_keys:
+            fb = self.speed
+        if "backward" in active_keys:
+            fb = -self.speed
+        if "left" in active_keys:
+            lr = -self.speed
+        if "right" in active_keys:
+            lr = self.speed
+        if "up" in active_keys:
+            ud = self.speed
+        if "down" in active_keys:
+            ud = -self.speed
+        if "yaw_left" in active_keys:
+            yaw = -self.speed
+        if "yaw_right" in active_keys:
+            yaw = self.speed
+
+        return lr, fb, ud, yaw
+
     def setup_keyboard_controls(self, controls: dict) -> None:
-        """Setup keyboard controls.
+        """
+        Set up keyboard controls.
 
         Args:
             controls: Dictionary mapping actions to keys
+
         """
 
         def on_press(key):
@@ -377,32 +425,11 @@ class TelloController:
         # Start control loop for continuous movement
         def control_loop():
             while not self._stop_event.is_set():
-                lr = fb = ud = yaw = 0
-
                 with self._active_keys_lock:
                     active_keys = set(self.active_keys)
 
-                if "forward" in active_keys:
-                    fb = self.speed
-                if "backward" in active_keys:
-                    fb = -self.speed
-                if "left" in active_keys:
-                    lr = -self.speed
-                if "right" in active_keys:
-                    lr = self.speed
-                if "up" in active_keys:
-                    ud = self.speed
-                if "down" in active_keys:
-                    ud = -self.speed
-                if "yaw_left" in active_keys:
-                    yaw = -self.speed
-                if "yaw_right" in active_keys:
-                    yaw = self.speed
-
-                if any([lr, fb, ud, yaw]):
-                    self.send_rc_control(lr, fb, ud, yaw)
-                else:
-                    self.send_rc_control(0, 0, 0, 0)
+                lr, fb, ud, yaw = self._compute_rc_vector_from_keys(active_keys)
+                self.send_rc_control(lr, fb, ud, yaw)
 
                 time.sleep(0.05)
 

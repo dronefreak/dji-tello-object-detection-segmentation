@@ -1,4 +1,5 @@
-"""YOLOv8 detector implementation using Ultralytics.
+"""
+YOLOv8 detector implementation using Ultralytics.
 
 Fast, real-time capable, and easy to use.
 """
@@ -10,11 +11,21 @@ import numpy as np
 
 from .base_detector import BaseDetector, Detection, DetectionResult
 
+# Threshold used to binarize a raw resized soft mask into a 0/1 mask.
+MASK_BINARIZATION_THRESHOLD = 0.5
+
 
 class YOLODetector(BaseDetector):
     """YOLOv8 instance segmentation detector."""
 
     def __init__(self, config: dict):
+        """
+        Initialize the detector with backend-specific configuration.
+
+        Args:
+            config: YOLOv8-specific configuration mapping.
+
+        """
         super().__init__(config)
         self.model = None
 
@@ -22,10 +33,10 @@ class YOLODetector(BaseDetector):
         """Load YOLOv8 model."""
         try:
             from ultralytics import YOLO
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "ultralytics not installed. Install with: pip install ultralytics"
-            )
+            ) from e
 
         model_name = self.config.get("model", "yolov8n-seg.pt")
         device = self.config.get("device", "cuda")
@@ -43,13 +54,15 @@ class YOLODetector(BaseDetector):
         print(f"YOLOv8 model loaded. Classes: {len(self.class_names)}")
 
     def detect(self, frame: np.ndarray) -> DetectionResult:
-        """Run YOLOv8 detection on frame.
+        """
+        Run YOLOv8 detection on frame.
 
         Args:
             frame: Input image (H, W, C) in BGR format
 
         Returns:
             DetectionResult with all detections
+
         """
         if not self._initialized:
             raise RuntimeError("Model not loaded. Call load_model() first.")
@@ -92,7 +105,7 @@ class YOLODetector(BaseDetector):
                         (frame.shape[1], frame.shape[0]),
                         interpolation=cv2.INTER_LINEAR,
                     )
-                    mask = (mask_resized > 0.5).astype(np.uint8)
+                    mask = (mask_resized > MASK_BINARIZATION_THRESHOLD).astype(np.uint8)
 
                 detection = Detection(
                     class_id=class_id,

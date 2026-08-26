@@ -1,4 +1,5 @@
-"""Benchmark different detector models.
+"""
+Benchmark different detector models.
 
 Compares speed and optionally accuracy across different backends and model sizes.
 """
@@ -9,14 +10,14 @@ from typing import Dict
 
 import numpy as np
 import yaml
-
 from tello_vision.detectors.base_detector import BaseDetector
 
 
 def benchmark_detector(
     detector: BaseDetector, num_frames: int = 100, resolution: tuple = (960, 720)
 ) -> Dict:
-    """Benchmark a detector.
+    """
+    Benchmark a detector.
 
     Args:
         detector: Detector instance
@@ -25,6 +26,7 @@ def benchmark_detector(
 
     Returns:
         Dictionary with benchmark results
+
     """
     print(f"Benchmarking {detector.__class__.__name__}...")
 
@@ -72,6 +74,7 @@ def benchmark_detector(
 
 
 def main():
+    """Run the detector benchmarking CLI."""
     parser = argparse.ArgumentParser(description="Benchmark detectors")
     parser.add_argument(
         "--num-frames", type=int, default=100, help="Number of frames to process"

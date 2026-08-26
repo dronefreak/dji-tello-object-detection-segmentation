@@ -11,10 +11,12 @@ _NON_UNIT_MARKERS = {"integration", "slow", "drone", "gpu"}
 
 
 def pytest_collection_modifyitems(items):
-    """Auto-mark tests as 'unit' unless they already carry another marker.
+    """
+    Auto-mark tests as 'unit' unless they already carry another marker.
 
     Args:
         items: Collected pytest test items.
+
     """
     for item in items:
         existing_markers = {marker.name for marker in item.iter_markers()}

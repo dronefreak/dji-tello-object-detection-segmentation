@@ -13,10 +13,12 @@ class Visualizer:
     """Visualize detection results on frames."""
 
     def __init__(self, config: dict):
-        """Initialize visualizer.
+        """
+        Initialize visualizer.
 
         Args:
             config: Visualization configuration
+
         """
         self.config = config
         self.class_colors: Dict[str, Tuple[int, int, int]] = {}
@@ -28,26 +30,29 @@ class Visualizer:
             }
 
     def get_color(self, class_name: str) -> Tuple[int, int, int]:
-        """Get color for a class.
+        """
+        Get color for a class.
 
         Args:
             class_name: Name of the class
 
         Returns:
             RGB color tuple
+
         """
         if class_name not in self.class_colors:
             # Generate random but consistent color
             random.seed(hash(class_name))
             self.class_colors[class_name] = (
-                random.randint(0, 255),  # nosec B311
-                random.randint(0, 255),  # nosec B311
-                random.randint(0, 255),  # nosec B311
+                random.randint(0, 255),  # noqa: S311 nosec B311
+                random.randint(0, 255),  # noqa: S311 nosec B311
+                random.randint(0, 255),  # noqa: S311 nosec B311
             )
         return self.class_colors[class_name]
 
     def draw_detection(self, frame: np.ndarray, detection: Detection) -> np.ndarray:
-        """Draw a single detection on the frame.
+        """
+        Draw a single detection on the frame.
 
         Args:
             frame: Input frame
@@ -55,6 +60,7 @@ class Visualizer:
 
         Returns:
             Frame with detection drawn
+
         """
         color = self.get_color(detection.class_name)
         x1, y1, x2, y2 = detection.bbox
@@ -80,7 +86,8 @@ class Visualizer:
         return frame
 
     def draw_detections(self, frame: np.ndarray, result: DetectionResult) -> np.ndarray:
-        """Draw all detections on the frame.
+        """
+        Draw all detections on the frame.
 
         Args:
             frame: Input frame
@@ -88,6 +95,7 @@ class Visualizer:
 
         Returns:
             Frame with all detections drawn
+
         """
         for detection in result.detections:
             frame = self.draw_detection(frame, detection)
@@ -152,7 +160,8 @@ class Visualizer:
     def draw_stats(
         self, frame: np.ndarray, stats: List[str], position: Tuple[int, int] = (10, 30)
     ) -> np.ndarray:
-        """Draw statistics text on frame.
+        """
+        Draw statistics text on frame.
 
         Args:
             frame: Input frame
@@ -161,6 +170,7 @@ class Visualizer:
 
         Returns:
             Frame with stats drawn
+
         """
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.6
@@ -187,7 +197,8 @@ class Visualizer:
     def draw_fps(
         self, frame: np.ndarray, fps: float, position: Optional[Tuple[int, int]] = None
     ) -> np.ndarray:
-        """Draw FPS counter on frame.
+        """
+        Draw FPS counter on frame.
 
         Args:
             frame: Input frame
@@ -196,6 +207,7 @@ class Visualizer:
 
         Returns:
             Frame with FPS drawn
+
         """
         if position is None:
             position = (frame.shape[1] - 150, 30)
@@ -221,7 +233,8 @@ class Visualizer:
         size: int = 20,
         color: Tuple[int, int, int] = (0, 255, 0),
     ) -> np.ndarray:
-        """Draw crosshair at center of frame.
+        """
+        Draw crosshair at center of frame.
 
         Args:
             frame: Input frame
@@ -230,6 +243,7 @@ class Visualizer:
 
         Returns:
             Frame with crosshair
+
         """
         h, w = frame.shape[:2]
         cx, cy = w // 2, h // 2

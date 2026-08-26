@@ -1,4 +1,5 @@
-"""Configuration validation utilities.
+"""
+Configuration validation utilities.
 
 Provides a small, dependency-free schema check for ``config.yaml`` so
 that missing or malformed configuration surfaces as an actionable error
@@ -25,13 +26,15 @@ class ConfigError(ValueError):
 
 
 def validate_config(config: Dict[str, Any]) -> None:
-    """Validate the structure of a loaded ``config.yaml`` dictionary.
+    """
+    Validate the structure of a loaded ``config.yaml`` dictionary.
 
     Args:
         config: Parsed configuration dictionary.
 
     Raises:
         ConfigError: If required sections or keys are missing or invalid.
+
     """
     if not isinstance(config, dict):
         raise ConfigError(
