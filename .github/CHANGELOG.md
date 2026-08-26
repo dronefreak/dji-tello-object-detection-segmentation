@@ -11,6 +11,12 @@
   live under `.github/`.
 - **Tooling**: mypy added as a blocking pre-commit hook and CI check
   (`tello_vision/`, `tests/`, `examples/`).
+- **Tooling**: bandit added as a blocking pre-commit hook and CI check
+  (medium confidence, `tello_vision/`, `examples/`).
+- **Fix**: the `# noqa: S311 nosec B311` suppression comments in
+  `visualizer.py` didn't actually suppress bandit's B311 finding -
+  bandit's nosec regex requires `nosec` to immediately follow a `#`.
+  Reordered to `# nosec B311  # noqa: S311`, which both tools honor.
 
 **Version 2.0.0 – 2025-01-15**
 A complete rewrite of the codebase with major modernization, performance improvements, and extensibility enhancements.
