@@ -35,10 +35,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-detectron2 = [
-    # Note: Install manually after torch is installed
-    # pip install 'git+https://github.com/facebookresearch/detectron2.git'
-]
+# Detectron2 is intentionally NOT listed here as an installable extra:
+# it isn't a normal PyPI package and must be installed manually via git
+# after torch is present (see README "Installation" and "Troubleshooting"
+# sections), e.g.:
+#   pip install 'git+https://github.com/facebookresearch/detectron2.git'
 yolo = [
     "ultralytics>=8.0.0",
 ]
