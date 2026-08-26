@@ -74,6 +74,67 @@ class TestTelloVisionApp:
     @patch("tello_vision.app.TelloController")
     @patch("tello_vision.app.BaseDetector")
     @patch("tello_vision.app.Visualizer")
+    def test_process_frame_async_inference(
+        self,
+        mock_viz,
+        mock_detector,
+        mock_controller,
+        sample_config,
+        sample_frame,
+        mock_detection_result,
+        tmp_path,
+    ):
+        """process_frame() uses background worker when async_inference on."""
+        import time
+
+        import yaml
+
+        sample_config["processing"]["async_inference"] = True
+        sample_config["processing"]["max_queue_size"] = 1
+
+        config_path = tmp_path / "test_config.yaml"
+        with open(config_path, "w") as f:
+            yaml.dump(sample_config, f)
+
+        mock_detector_instance = Mock()
+        mock_detector_instance.detect.return_value = mock_detection_result
+        mock_detector.create_detector.return_value = mock_detector_instance
+
+        mock_viz_instance = Mock()
+        mock_viz_instance.draw_detections.return_value = sample_frame
+        mock_viz_instance.draw_stats.return_value = sample_frame
+        mock_viz_instance.draw_fps.return_value = sample_frame
+        mock_viz.return_value = mock_viz_instance
+
+        mock_controller_instance = Mock()
+        mock_controller_instance.get_stats_text.return_value = ["Battery: 85%"]
+        mock_controller_instance.is_recording = False
+        mock_controller.return_value = mock_controller_instance
+
+        app = TelloVisionApp(str(config_path))
+        assert app.inference_worker is not None
+
+        # No result yet: should still return a frame without blocking.
+        result_frame = app.process_frame(sample_frame)
+        assert result_frame is not None
+
+        app.inference_worker.start()
+        try:
+            deadline = time.time() + 2.0
+            while (
+                time.time() < deadline
+                and app.inference_worker.get_latest_result() is None
+            ):
+                app.process_frame(sample_frame)
+                time.sleep(0.01)
+
+            assert app.inference_worker.get_latest_result() is not None
+        finally:
+            app.inference_worker.stop(timeout=2.0)
+
+    @patch("tello_vision.app.TelloController")
+    @patch("tello_vision.app.BaseDetector")
+    @patch("tello_vision.app.Visualizer")
     def test_update_fps(
         self, mock_viz, mock_detector, mock_controller, sample_config, tmp_path
     ):

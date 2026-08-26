@@ -13,7 +13,8 @@ import numpy as np
 import yaml
 
 from .config_validator import ConfigError, validate_config
-from .detectors.base_detector import BaseDetector
+from .detectors.base_detector import BaseDetector, DetectionResult
+from .inference_worker import AsyncInferenceWorker
 from .tello_controller import TelloController
 from .visualizer import Visualizer
 
@@ -64,6 +65,17 @@ class TelloVisionApp:
         # Processing config
         self.processing_config = self.config["processing"]
 
+        # Optional async inference: run detection on a background thread so
+        # a slow model doesn't block frame capture/display. Disabled unless
+        # explicitly enabled in config, to preserve existing synchronous
+        # behavior (and keep tests deterministic) by default.
+        self.inference_worker: Optional[AsyncInferenceWorker] = None
+        if self.processing_config.get("async_inference", False):
+            max_queue_size = self.processing_config.get("max_queue_size", 1)
+            self.inference_worker = AsyncInferenceWorker(
+                self.detector, max_queue_size=max_queue_size
+            )
+
         # State
         self.running = False
         self.frame_count = 0
@@ -88,6 +100,9 @@ class TelloVisionApp:
         print("\n[1/3] Loading detection model...")
         self.detector.load_model()
         self.detector.warmup()
+
+        if self.inference_worker is not None:
+            self.inference_worker.start()
 
         if self.no_drone:
             # Test mode: use the local webcam instead of a real drone
@@ -132,8 +147,21 @@ class TelloVisionApp:
         if frame_skip > 0 and self.frame_count % (frame_skip + 1) != 0:
             return frame
 
-        # Run detection
-        result = self.detector.detect(frame)
+        # Run detection. When async inference is enabled, submit this frame
+        # to the background worker and draw the most recent completed
+        # result instead of blocking here until this exact frame finishes;
+        # this decouples display FPS from inference FPS.
+        if self.inference_worker is not None:
+            self.inference_worker.submit_frame(frame)
+            result = self.inference_worker.get_latest_result()
+            if result is None:
+                # Worker hasn't produced a result yet (e.g. still on its
+                # first frame) - show the raw frame with no detections.
+                result = DetectionResult(
+                    detections=[], inference_time=0.0, frame_shape=frame.shape
+                )
+        else:
+            result = self.detector.detect(frame)
 
         # Filter by target classes if configured
         target_classes = self.config["detector"].get("target_classes", [])
@@ -262,6 +290,9 @@ class TelloVisionApp:
         """Shutdown application and cleanup."""
         print("\nShutting down...")
         self.running = False
+
+        if self.inference_worker is not None:
+            self.inference_worker.stop()
 
         # Cleanup
         cv2.destroyAllWindows()
