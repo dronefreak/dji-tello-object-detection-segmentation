@@ -320,7 +320,7 @@ class TelloVisionApp:
         print("Shutdown complete")
 
 
-def main():
+def main() -> None:
     """Run the main entry point."""
     parser = argparse.ArgumentParser(
         description="Tello Vision - Modern instance segmentation for DJI Tello"

@@ -5,11 +5,18 @@ Fast, real-time capable, and easy to use.
 """
 
 import time
+from typing import TYPE_CHECKING, Optional
 
 import cv2
 import numpy as np
 
 from .base_detector import BaseDetector, Detection, DetectionResult
+
+if TYPE_CHECKING:
+    # Only needed for type-checking: ultralytics is an optional dependency
+    # (see the `yolo` extra in pyproject.toml) and is actually imported
+    # lazily in load_model() so it isn't required at runtime.
+    from ultralytics import YOLO
 
 # Threshold used to binarize a raw resized soft mask into a 0/1 mask.
 MASK_BINARIZATION_THRESHOLD = 0.5
@@ -27,7 +34,7 @@ class YOLODetector(BaseDetector):
 
         """
         super().__init__(config)
-        self.model = None
+        self.model: Optional["YOLO"] = None
 
     def load_model(self) -> None:
         """Load YOLOv8 model."""
@@ -64,7 +71,7 @@ class YOLODetector(BaseDetector):
             DetectionResult with all detections
 
         """
-        if not self._initialized:
+        if not self._initialized or self.model is None:
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         start_time = time.time()

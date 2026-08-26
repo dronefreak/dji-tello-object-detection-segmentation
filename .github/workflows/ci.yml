@@ -68,8 +68,8 @@ jobs:
       - name: Run ruff format check
         run: ruff format --check --diff tello_vision/ tests/ examples/
 
-      - name: Run mypy (non-blocking)
-        run: mypy tello_vision/ || true
+      - name: Run mypy
+        run: mypy tello_vision/ tests/ examples/ --ignore-missing-imports
 
   test:
     name: Tests - Python ${{ matrix.python-version }} on ${{ matrix.os }}

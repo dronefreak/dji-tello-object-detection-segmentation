@@ -5,6 +5,7 @@ Higher quality but slower than YOLO. Good for precision applications.
 """
 
 import time
+from typing import Any, Optional
 
 import numpy as np
 
@@ -23,8 +24,11 @@ class Detectron2Detector(BaseDetector):
 
         """
         super().__init__(config)
-        self.predictor = None
-        self.metadata = None
+        # Typed as Any: detectron2 isn't a normal installable/typed package
+        # (see pyproject.toml's note on the missing `detectron2` extra), so
+        # there are no useful stubs for DefaultPredictor/Metadata to import.
+        self.predictor: Optional[Any] = None
+        self.metadata: Optional[Any] = None
 
     def load_model(self) -> None:
         """Load Detectron2 model."""
@@ -89,7 +93,7 @@ class Detectron2Detector(BaseDetector):
             DetectionResult with all detections
 
         """
-        if not self._initialized:
+        if not self._initialized or self.predictor is None:
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         start_time = time.time()

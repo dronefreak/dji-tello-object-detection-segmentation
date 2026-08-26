@@ -91,6 +91,12 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+# Test functions take untyped fixture/mock arguments (pytest, pytest-mock)
+# that aren't worth annotating individually; still type-checked otherwise.
+module = "tests.*"
+disallow_untyped_defs = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

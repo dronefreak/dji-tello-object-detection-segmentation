@@ -13,7 +13,7 @@ from tello_vision.detectors.base_detector import BaseDetector
 from tello_vision.visualizer import Visualizer
 
 
-def main():
+def main() -> None:
     """Run detection on a webcam or video-file source for quick testing."""
     parser = argparse.ArgumentParser()
     parser.add_argument(

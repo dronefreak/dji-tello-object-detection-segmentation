@@ -119,7 +119,7 @@ class BaseDetector(ABC):
     @property
     def device(self) -> str:
         """Get the device the model is running on."""
-        return self.config.get("device", "cpu")
+        return str(self.config.get("device", "cpu"))
 
     @staticmethod
     def create_detector(backend: str, config: dict) -> "BaseDetector":
