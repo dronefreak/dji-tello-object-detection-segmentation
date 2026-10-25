@@ -23,9 +23,11 @@ from .visualizer import Visualizer
 # busy-spinning a CPU core while waiting for the video stream to recover.
 NO_FRAME_RETRY_DELAY = 0.01
 
-# cv2.waitKey() key codes used for interactive controls.
-KEY_ESC = 27
+# cv2.waitKey() key codes used for interactive controls. Esc is
+# deliberately not a quit key: it is the emergency motor stop, and quitting
+# with it in flight would drop the drone. Quit with 'p' (lands first).
 KEY_ENTER = 13
+KEY_QUIT = ord("p")
 
 
 class TelloVisionApp:
@@ -136,9 +138,14 @@ class TelloVisionApp:
         self.drone.setup_keyboard_controls(self.config["controls"])
 
         print("\n✓ Initialization complete!")
-        print("\nControls:")
+        print("\nControls (only while the video window is focused):")
         for action, key in self.config["controls"].items():
             print(f"  {action}: {key}")
+        emergency_key = self.config["controls"].get("emergency")
+        if emergency_key:
+            print(
+                f"\nWARNING: '{emergency_key}' cuts the motors - the drone will fall."
+            )
 
         return True
 
@@ -163,7 +170,9 @@ class TelloVisionApp:
         # result instead of blocking here until this exact frame finishes;
         # this decouples display FPS from inference FPS.
         if self.inference_worker is not None:
-            self.inference_worker.submit_frame(frame)
+            # Submit a copy: the visualizer draws on `frame` in place below,
+            # and the worker must not see (or race with) those overlays.
+            self.inference_worker.submit_frame(frame.copy())
             result = self.inference_worker.get_latest_result()
             if result is None:
                 # Worker hasn't produced a result yet (e.g. still on its
@@ -211,8 +220,9 @@ class TelloVisionApp:
             self.frame_count = 0
             self.last_fps_time = current_time
 
-            # Update drone stats
-            self.drone.update_stats()
+            # Update drone stats (there's no drone to ask in --no-drone mode)
+            if not self.no_drone:
+                self.drone.update_stats()
 
     def get_frame(self) -> Optional[np.ndarray]:
         """
@@ -247,6 +257,12 @@ class TelloVisionApp:
 
         window_name = self.processing_config.get("window_name", "Tello Vision")
 
+        if not self.no_drone and not self.processing_config.get("display_window", True):
+            print(
+                "WARNING: display_window is off, so no keyboard controls "
+                "(including takeoff/land/emergency) will work."
+            )
+
         try:
             while self.running:
                 # Get frame from the active video source
@@ -268,11 +284,17 @@ class TelloVisionApp:
                 # Update FPS
                 self.update_fps()
 
-                # Check for quit
+                # Keys only arrive here while the video window is focused.
                 key = cv2.waitKey(1) & 0xFF
-                if key == ord("p") or key == KEY_ESC:  # 'p' or ESC
+                if key == KEY_QUIT:
                     break
-                elif key == ord("r"):
+
+                # Flight keys (takeoff/land/emergency) and focus
+                # confirmation for held movement keys.
+                if not self.no_drone:
+                    self.drone.handle_window_key(key)
+
+                if key == ord("r"):
                     self.toggle_recording()
                 elif key == KEY_ENTER:  # Enter
                     self.take_photo(processed_frame)

@@ -385,3 +385,81 @@ class TestTelloVisionApp:
         mock_detector.create_detector.assert_called_once_with(
             "yolov8", sample_config["detector"]["yolov8"]
         )
+
+
+def _write_config(config, tmp_path):
+    import yaml
+
+    config_path = tmp_path / "test_config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+    return str(config_path)
+
+
+@patch("tello_vision.app.cv2")
+@patch("tello_vision.app.TelloController")
+@patch("tello_vision.app.BaseDetector")
+@patch("tello_vision.app.Visualizer")
+def test_escape_does_not_quit(
+    mock_viz,
+    mock_detector,
+    mock_controller,
+    mock_cv2,
+    sample_config,
+    sample_frame,
+    tmp_path,
+):
+    """Esc is the emergency key: it goes to the drone and must not end the loop."""
+    sample_config["processing"]["output_dir"] = str(tmp_path / "out")
+    app = TelloVisionApp(_write_config(sample_config, tmp_path))
+    app.process_frame = Mock(return_value=sample_frame)  # type: ignore[method-assign]
+    app.drone.get_frame.return_value = sample_frame
+
+    mock_cv2.waitKey.side_effect = [27, 0xFF, ord("p")]
+    app.run()
+
+    handled = [c.args[0] for c in app.drone.handle_window_key.call_args_list]
+    assert handled == [27, 0xFF]  # 'p' quits before reaching the drone
+    assert app.process_frame.call_count == 3
+    app.drone.disconnect.assert_called_once()
+
+
+@patch("tello_vision.app.TelloController")
+@patch("tello_vision.app.BaseDetector")
+@patch("tello_vision.app.Visualizer")
+def test_async_worker_gets_frame_copy(
+    mock_viz, mock_detector, mock_controller, sample_config, sample_frame, tmp_path
+):
+    """The worker must not share the array the visualizer draws on."""
+    sample_config["processing"]["async_inference"] = True
+    sample_config["processing"]["output_dir"] = str(tmp_path / "out")
+    app = TelloVisionApp(_write_config(sample_config, tmp_path))
+    app.inference_worker = Mock()
+    app.inference_worker.get_latest_result.return_value = None
+    app.drone.is_recording = False
+    app.drone.get_stats_text.return_value = []
+
+    app.process_frame(sample_frame)
+
+    submitted = app.inference_worker.submit_frame.call_args.args[0]
+    assert submitted is not sample_frame
+    assert (submitted == sample_frame).all()
+
+
+@patch("tello_vision.app.TelloController")
+@patch("tello_vision.app.BaseDetector")
+@patch("tello_vision.app.Visualizer")
+def test_no_drone_mode_skips_drone_stats(
+    mock_viz, mock_detector, mock_controller, sample_config, tmp_path
+):
+    """Without a drone, polling its stats only fails and spams the console."""
+    import time
+
+    sample_config["processing"]["output_dir"] = str(tmp_path / "out")
+    app = TelloVisionApp(_write_config(sample_config, tmp_path), no_drone=True)
+    app.last_fps_time = time.time() - 2.0
+
+    app.update_fps()
+
+    assert app.fps > 0
+    app.drone.update_stats.assert_not_called()

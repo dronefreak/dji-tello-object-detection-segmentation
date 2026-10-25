@@ -51,11 +51,11 @@ With Tello connected:
 python -m tello_vision.app
 ```
 
-Controls:
+Controls (only while the video window is focused):
 
 - **Tab**: Takeoff
 - **W/A/S/D**: Move
-- **Space/Shift**: Up/Down
+- **Space/X**: Up/Down
 - **Q/E**: Rotate
 - **R**: Record video
 - **Enter**: Take photo

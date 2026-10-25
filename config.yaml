@@ -57,7 +57,10 @@ processing:
   # inference FPS. If the model can't keep up, older un-processed frames
   # are dropped in favor of the newest one instead of backing up.
   async_inference: true # Run detection in a background thread
-  max_queue_size: 3 # Max frames buffered for the inference worker
+  # Max frames buffered for the inference worker. Keep at 1: frames are
+  # processed oldest-first, so each extra slot adds a full inference time
+  # of delay to the detections.
+  max_queue_size: 1
 
   # Recording
   record_video: false
@@ -88,16 +91,19 @@ visualization:
     # Add more as needed
 
 # Keyboard Controls
+# Keys only work while the video window is focused. Use letters, digits,
+# or space/tab/enter/backspace/esc - modifier keys (shift, ctrl, alt) can't
+# be seen by the video window and are ignored.
 controls:
   takeoff: "tab"
   land: "backspace"
-  emergency: "esc"
+  emergency: "esc" # Cuts motors immediately - the drone will fall!
   forward: "w"
   backward: "s"
   left: "a"
   right: "d"
   up: "space"
-  down: "shift"
+  down: "x"
   yaw_left: "q"
   yaw_right: "e"
   toggle_record: "r"
