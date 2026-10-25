@@ -301,6 +301,165 @@ class TestTelloController:
         assert controller._control_thread is None
 
 
+def _make_controller(sample_config, mock_tello_class):
+    """Create a controller with a mock drone and the sample key mapping."""
+    mock_drone = Mock()
+    mock_tello_class.return_value = mock_drone
+    controller = TelloController(sample_config["drone"])
+    controller.controls = {
+        **sample_config["controls"],
+        "emergency": "esc",
+        "down": "shift",
+    }
+    return controller, mock_drone
+
+
+class TestFlightSafety:
+    """Regression tests for flight-safety fixes."""
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_get_frame_returns_copy(self, mock_tello_class, sample_config):
+        """Drawing on a returned frame must not touch djitellopy's buffer."""
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        buffer = np.zeros((720, 960, 3), dtype=np.uint8)
+        mock_drone.get_frame_read.return_value = Mock(frame=buffer)
+
+        frame = controller.get_frame()
+        assert frame is not None
+        frame[:] = 255
+
+        assert frame is not buffer
+        assert buffer.max() == 0
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_takeoff_failure_does_not_raise(self, mock_tello_class, sample_config):
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        mock_drone.takeoff.side_effect = Exception("battery too low")
+        mock_drone.get_height.side_effect = Exception("no state")
+
+        assert controller.takeoff() is False
+        assert not controller.is_flying
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_takeoff_timeout_while_airborne_is_tracked(
+        self, mock_tello_class, sample_config
+    ):
+        """If takeoff errors but the drone reports height, still land it later."""
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        mock_drone.takeoff.side_effect = Exception("timeout")
+        mock_drone.get_height.return_value = 80
+
+        assert controller.takeoff() is True
+        assert controller.is_flying
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_land_failure_keeps_flying_state(self, mock_tello_class, sample_config):
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        controller.is_flying = True
+        mock_drone.land.side_effect = Exception("no response")
+
+        assert controller.land() is False
+        assert controller.is_flying  # so disconnect() retries landing
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_emergency_failure_does_not_raise(self, mock_tello_class, sample_config):
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        controller.is_flying = True
+        mock_drone.emergency.side_effect = OSError("socket closed")
+
+        controller.emergency()
+        assert not controller.is_flying
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_window_emergency_key_is_immediate(self, mock_tello_class, sample_config):
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        controller.handle_window_key(27)
+        mock_drone.emergency.assert_called_once()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_window_takeoff_runs_off_main_thread(self, mock_tello_class, sample_config):
+        """Takeoff must not block the video loop (and the emergency key)."""
+        import threading
+
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        release = threading.Event()
+        mock_drone.takeoff.side_effect = lambda: release.wait(2.0)
+
+        controller.handle_window_key(9)  # Tab; returns while takeoff blocks
+        controller.handle_window_key(27)  # Emergency still goes through
+        mock_drone.emergency.assert_called_once()
+
+        release.set()
+        assert controller._command_thread is not None
+        controller._command_thread.join(timeout=2.0)
+        mock_drone.takeoff.assert_called_once()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_unfocused_keys_do_nothing(self, mock_tello_class, sample_config):
+        """Keys from other apps reach pynput only; they must not fly the drone."""
+        controller, mock_drone = _make_controller(sample_config, mock_tello_class)
+        key_w = Mock(spec=["char"], char="w")
+
+        controller._on_key_press(key_w)
+        pressed_at = controller._held_keys["forward"]
+
+        assert controller._active_movement_actions(now=pressed_at) == set()
+        # The window never saw it: rejected after the timeout...
+        assert controller._active_movement_actions(now=pressed_at + 2.0) == set()
+        # ...and stays rejected even if the window later sees a 'w'.
+        controller.handle_window_key(ord("w"))
+        assert controller._active_movement_actions() == set()
+
+        # Releasing clears it, so the next focused press works again.
+        controller._on_key_release(key_w)
+        assert controller._held_keys == {}
+        mock_drone.takeoff.assert_not_called()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_focused_movement_key_is_confirmed(self, mock_tello_class, sample_config):
+        controller, _ = _make_controller(sample_config, mock_tello_class)
+        key_w = Mock(spec=["char"], char="w")
+
+        controller._on_key_press(key_w)
+        controller.handle_window_key(ord("w"))
+
+        assert controller._active_movement_actions() == {"forward"}
+        controller._on_key_release(key_w)
+        assert controller._active_movement_actions() == set()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_modifier_movement_key_is_never_confirmed(
+        self, mock_tello_class, sample_config
+    ):
+        """Shift can't be seen by the video window, so it can't move the drone."""
+        controller, _ = _make_controller(sample_config, mock_tello_class)
+        key_shift = Mock(spec=["name"])
+        key_shift.name = "shift"
+
+        controller._on_key_press(key_shift)
+        controller.handle_window_key(ord("x"))
+        assert controller._active_movement_actions() == set()
+
+    @patch("tello_vision.tello_controller.Tello")
+    def test_key_handler_errors_do_not_propagate(self, mock_tello_class, sample_config):
+        """An exception escaping a pynput callback would stop the listener."""
+        controller, _ = _make_controller(sample_config, mock_tello_class)
+        controller.controls = Mock(get=Mock(side_effect=RuntimeError("boom")))
+        key_w = Mock(spec=["char"], char="w")
+
+        controller._on_key_press(key_w)
+        controller._on_key_release(key_w)
+
+    def test_window_key_codes(self):
+        from tello_vision.tello_controller import window_key_codes
+
+        assert window_key_codes("tab") == (9,)
+        assert window_key_codes("backspace") == (8, 127)
+        assert window_key_codes("W") == (ord("w"),)
+        assert window_key_codes("shift") == ()
+        assert window_key_codes(None) == ()
+
+
 @pytest.mark.drone
 class TestTelloControllerIntegration:
     """Integration tests requiring actual drone."""

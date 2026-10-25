@@ -6,7 +6,7 @@ Handles video streaming, keyboard controls, and flight commands.
 
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Tuple
 
 import cv2
 import numpy as np
@@ -40,6 +40,56 @@ MAX_CONNECT_RETRY_DELAY = 10.0  # cap for exponential backoff
 
 # How long to wait for background threads to exit on disconnect().
 THREAD_JOIN_TIMEOUT = 2.0
+
+# Takeoff can take up to ~20s to be acknowledged (djitellopy's
+# TAKEOFF_TIMEOUT), so allow an in-flight command time to finish before
+# disconnect() sends anything else to the drone.
+FLIGHT_COMMAND_JOIN_TIMEOUT = 25.0
+
+# Key codes cv2.waitKey() returns for named keys. Backspace differs by
+# platform (8 on Linux/Windows, 127 on macOS); Enter can be 13 or 10.
+# Modifier keys (shift, ctrl, alt) never reach cv2.waitKey() on their own,
+# so they can't be used as flight keys.
+NAMED_WINDOW_KEY_CODES: Dict[str, Tuple[int, ...]] = {
+    "tab": (9,),
+    "backspace": (8, 127),
+    "esc": (27,),
+    "enter": (13, 10),
+    "space": (32,),
+}
+
+# A movement key held in pynput only counts once the video window has
+# also seen that key, proving the window had focus when it was pressed.
+# SLACK covers the window seeing the key slightly before pynput does;
+# TIMEOUT is how long to wait for the window (whose loop may be slowed
+# by inference) before rejecting the press as coming from another app.
+WINDOW_CONFIRM_SLACK = 0.25  # seconds
+WINDOW_CONFIRM_TIMEOUT = 1.0  # seconds
+
+# cv2.waitKey(1) & 0xFF returns 255 when no key was pressed.
+NO_WINDOW_KEY = 255
+
+
+def window_key_codes(key_name: Optional[str]) -> Tuple[int, ...]:
+    """
+    Map a config key name (e.g. "tab", "w") to the codes cv2.waitKey() returns.
+
+    Args:
+        key_name: Key name from the ``controls`` config section.
+
+    Returns:
+        Matching key codes, or an empty tuple if the video window can't
+        see this key (e.g. a modifier like "shift").
+
+    """
+    if not key_name:
+        return ()
+    name = str(key_name).lower()
+    if name in NAMED_WINDOW_KEY_CODES:
+        return NAMED_WINDOW_KEY_CODES[name]
+    if len(name) == 1:
+        return (ord(name),)
+    return ()
 
 
 class TelloController:
@@ -77,10 +127,18 @@ class TelloController:
             "connect_retry_delay", DEFAULT_CONNECT_RETRY_DELAY
         )
 
-        # Keyboard listener
+        # Keyboard input. pynput sees keys system-wide, so it is only used
+        # to track held movement keys; each held key must also be seen by
+        # the focused video window (see handle_window_key()) before it
+        # moves the drone. One-shot flight commands come only from the
+        # video window.
         self.listener: Optional["keyboard.Listener"] = None
-        self.active_keys: set = set()
-        self._active_keys_lock = threading.Lock()
+        self.controls: Dict[str, str] = {}
+        self._keys_lock = threading.Lock()
+        self._held_keys: Dict[str, float] = {}  # action -> press time
+        self._confirmed_keys: Set[str] = set()
+        self._rejected_keys: Set[str] = set()
+        self._window_key_times: Dict[int, float] = {}  # key code -> last seen
 
         # Background thread lifecycle management. A single stop event is
         # shared by the video stream and control loops so disconnect() can
@@ -88,6 +146,11 @@ class TelloController:
         self._stop_event = threading.Event()
         self._stream_thread: Optional[threading.Thread] = None
         self._control_thread: Optional[threading.Thread] = None
+
+        # Takeoff/land block until the drone answers (up to ~20s), so they
+        # run on this thread to keep the video loop - and the emergency
+        # key - responsive.
+        self._command_thread: Optional[threading.Thread] = None
 
     def connect(self) -> bool:
         """
@@ -148,6 +211,14 @@ class TelloController:
         self._stream_thread = None
         self._control_thread = None
 
+        # Let an in-progress takeoff/land finish first, so its response
+        # isn't mixed up with the land command below.
+        command_thread = self._command_thread
+        if command_thread is not None and command_thread.is_alive():
+            print("Waiting for in-progress flight command to finish...")
+            command_thread.join(timeout=FLIGHT_COMMAND_JOIN_TIMEOUT)
+        self._command_thread = None
+
         if self.is_flying:
             self.land()
 
@@ -174,12 +245,15 @@ class TelloController:
         Get current video frame from drone.
 
         Returns:
-            Frame as numpy array (BGR) or None if unavailable
+            Frame as numpy array (BGR) or None if unavailable. This is a
+            copy: djitellopy keeps returning the same array until a new
+            frame is decoded, so drawing on it directly would stack
+            overlays across loop iterations and feed them to the detector.
 
         """
         try:
             frame: Optional[np.ndarray] = self.drone.get_frame_read().frame
-            return frame
+            return None if frame is None else frame.copy()
         except Exception as e:
             print(f"Error getting frame: {e}")
             return None
@@ -207,27 +281,86 @@ class TelloController:
         self._stream_thread = threading.Thread(target=stream_loop, daemon=True)
         self._stream_thread.start()
 
-    def takeoff(self) -> None:
-        """Take off the drone."""
-        if not self.is_flying:
-            print("Taking off...")
-            self.drone.takeoff()
-            self.is_flying = True
-            print("Airborne!")
+    def takeoff(self) -> bool:
+        """
+        Take off the drone.
 
-    def land(self) -> None:
-        """Land the drone."""
+        Errors (e.g. low battery, no response) are reported rather than
+        raised, so a failed takeoff can't take down the caller.
+
+        Returns:
+            True if the drone is airborne afterwards.
+
+        """
         if self.is_flying:
-            print("Landing...")
+            return True
+
+        print("Taking off...")
+        try:
+            self.drone.takeoff()
+        except Exception as e:
+            print(f"Takeoff failed: {e}")
+            # The command may have timed out even though the drone did
+            # take off. If so, track it as flying so it still gets landed.
+            if self._reports_airborne():
+                print("Drone reports a non-zero height; treating it as airborne.")
+                self.is_flying = True
+            return self.is_flying
+
+        self.is_flying = True
+        print("Airborne!")
+        return True
+
+    def land(self) -> bool:
+        """
+        Land the drone.
+
+        Returns:
+            True if the drone is on the ground afterwards. On failure the
+            drone is still treated as flying, so a later land() (e.g. from
+            disconnect()) tries again.
+
+        """
+        if not self.is_flying:
+            return True
+
+        print("Landing...")
+        try:
             self.drone.land()
-            self.is_flying = False
-            print("Landed")
+        except Exception as e:
+            print(f"Landing failed: {e}. The drone may still be airborne!")
+            return False
+
+        self.is_flying = False
+        print("Landed")
+        return True
 
     def emergency(self) -> None:
-        """Emergency stop - cuts motors immediately."""
+        """Emergency stop - cuts motors immediately (the drone will fall)."""
         print("EMERGENCY STOP!")
-        self.drone.emergency()
+        try:
+            self.drone.emergency()
+        except Exception as e:
+            print(f"Emergency command failed: {e}")
         self.is_flying = False
+
+    def _reports_airborne(self) -> bool:
+        """Best-effort check of the drone's reported height after an error."""
+        try:
+            return int(self.drone.get_height()) > 0
+        except Exception:
+            return False
+
+    def _run_flight_command(self, command: Callable[[], bool]) -> None:
+        """Run a blocking takeoff/land on the command thread, one at a time."""
+        if self._command_thread is not None and self._command_thread.is_alive():
+            print("Previous flight command still running; ignoring key.")
+            return
+
+        self._command_thread = threading.Thread(
+            target=command, name="TelloFlightCommand", daemon=True
+        )
+        self._command_thread.start()
 
     # Movement commands
     def move_forward(self, distance: int = 20) -> None:
@@ -351,7 +484,102 @@ class TelloController:
         if self.is_recording and self.video_writer:
             self.video_writer.write(frame)
 
-    def _compute_rc_vector_from_keys(self, active_keys: set) -> tuple:
+    def handle_window_key(self, key: int) -> None:
+        """
+        Handle a key code read from the focused video window.
+
+        Call this every loop iteration with ``cv2.waitKey(1) & 0xFF``.
+        Takeoff, land and emergency only come from here, so they only fire
+        while the video window has focus. Each key seen here also confirms
+        any matching movement key held in pynput.
+
+        Args:
+            key: Key code from cv2.waitKey() (255 means no key).
+
+        """
+        if key == NO_WINDOW_KEY or key < 0:
+            return
+
+        with self._keys_lock:
+            self._window_key_times[key] = time.time()
+
+        if key in window_key_codes(self.controls.get("emergency")):
+            self.emergency()
+        elif key in window_key_codes(self.controls.get("takeoff")):
+            self._run_flight_command(self.takeoff)
+        elif key in window_key_codes(self.controls.get("land")):
+            self._run_flight_command(self.land)
+
+    def _key_to_action(self, key: Any) -> Optional[str]:
+        """Map a pynput key to a configured movement action, if any."""
+        name = getattr(key, "char", None) or getattr(key, "name", None)
+        if not name:
+            return None
+        name = str(name).lower()
+        for action in MOVEMENT_ACTIONS:
+            if name == str(self.controls.get(action, "")).lower():
+                return action
+        return None
+
+    def _on_key_press(self, key: Any) -> None:
+        """Record when a movement key goes down (pynput listener thread)."""
+        try:
+            action = self._key_to_action(key)
+            if action is None:
+                return
+            with self._keys_lock:
+                # OS key-repeat sends more presses while held; keep the first.
+                self._held_keys.setdefault(action, time.time())
+        except Exception as e:  # keep the listener alive whatever happens
+            print(f"Keyboard press handler error: {e}")
+
+    def _on_key_release(self, key: Any) -> None:
+        """Forget a movement key once it is released (pynput listener thread)."""
+        try:
+            action = self._key_to_action(key)
+            if action is None:
+                return
+            with self._keys_lock:
+                self._held_keys.pop(action, None)
+                self._confirmed_keys.discard(action)
+                self._rejected_keys.discard(action)
+        except Exception as e:  # keep the listener alive whatever happens
+            print(f"Keyboard release handler error: {e}")
+
+    def _active_movement_actions(self, now: Optional[float] = None) -> Set[str]:
+        """
+        Return the held movement actions confirmed by the video window.
+
+        A held key is confirmed once the window has seen one of its key
+        codes since (just before) it was pressed. If the window doesn't
+        see it within WINDOW_CONFIRM_TIMEOUT, the press came from another
+        app and is ignored until the key is released.
+
+        Args:
+            now: Current time (defaults to time.time()); for tests.
+
+        Returns:
+            Set of confirmed action names.
+
+        """
+        if now is None:
+            now = time.time()
+
+        with self._keys_lock:
+            for action, pressed_at in self._held_keys.items():
+                if action in self._confirmed_keys or action in self._rejected_keys:
+                    continue
+                codes = window_key_codes(self.controls.get(action))
+                seen = [
+                    self._window_key_times.get(code, float("-inf")) for code in codes
+                ]
+                if any(t >= pressed_at - WINDOW_CONFIRM_SLACK for t in seen):
+                    self._confirmed_keys.add(action)
+                elif now - pressed_at > WINDOW_CONFIRM_TIMEOUT:
+                    self._rejected_keys.add(action)
+            return set(self._confirmed_keys)
+
+    def _compute_rc_vector_from_keys(self, active_keys: Set[str]) -> tuple:
         """
         Translate currently-held movement keys into an RC control vector.
 
@@ -387,60 +615,48 @@ class TelloController:
         """
         Set up keyboard controls.
 
+        Takeoff/land/emergency are read from the video window via
+        handle_window_key(). Held movement keys are tracked with pynput
+        (which reports key releases, unlike cv2.waitKey()), but only move
+        the drone once the video window confirms it had focus.
+
         Args:
             controls: Dictionary mapping actions to keys
 
         """
+        self.controls = dict(controls)
+
+        for action in ("takeoff", "land", "emergency", *MOVEMENT_ACTIONS):
+            key_name = self.controls.get(action)
+            if key_name and not window_key_codes(key_name):
+                print(
+                    f"Warning: '{action}' key '{key_name}' can't be seen by the "
+                    "video window, so it is disabled. Use a letter, digit, "
+                    "space, tab, enter, backspace or esc instead."
+                )
+
         # Imported lazily (see the TYPE_CHECKING import above): this
         # requires a real display and is only actually needed here.
         from pynput import keyboard
 
-        def on_press(key: Any) -> None:
-            try:
-                k = key.char if hasattr(key, "char") else key.name
-
-                if k == controls.get("takeoff"):
-                    self.takeoff()
-                elif k == controls.get("land"):
-                    self.land()
-                elif k == controls.get("emergency"):
-                    self.emergency()
-                else:
-                    for action in MOVEMENT_ACTIONS:
-                        if k == controls.get(action):
-                            with self._active_keys_lock:
-                                self.active_keys.add(action)
-                            break
-
-            except AttributeError:
-                pass
-
-        def on_release(key: Any) -> None:
-            try:
-                k = key.char if hasattr(key, "char") else key.name
-
-                # Remove from active keys
-                for action in MOVEMENT_ACTIONS:
-                    if k == controls.get(action):
-                        with self._active_keys_lock:
-                            self.active_keys.discard(action)
-
-            except AttributeError:
-                pass
-
-        self.listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        self.listener = keyboard.Listener(
+            on_press=self._on_key_press, on_release=self._on_key_release
+        )
         self.listener.start()
 
         self._stop_event.clear()
 
-        # Start control loop for continuous movement
+        # Control loop for continuous movement. It also acts as a
+        # keepalive: while flying it keeps sending (0, 0, 0, 0) so the
+        # drone hovers when no key is held.
         def control_loop() -> None:
             while not self._stop_event.is_set():
-                with self._active_keys_lock:
-                    active_keys = set(self.active_keys)
-
+                active_keys = self._active_movement_actions()
                 lr, fb, ud, yaw = self._compute_rc_vector_from_keys(active_keys)
-                self.send_rc_control(lr, fb, ud, yaw)
+                try:
+                    self.send_rc_control(lr, fb, ud, yaw)
+                except Exception as e:  # keep the loop (and keepalive) running
+                    print(f"RC control error: {e}")
 
                 time.sleep(0.05)
 

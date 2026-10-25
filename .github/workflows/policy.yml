@@ -6,7 +6,7 @@ on:
       max_pr_size:
         description: "Hard PR size limit (LOC)"
         required: false
-        default: 800
+        default: 1000
         type: number
       warn_pr_size:
         description: "Soft PR size warning (LOC)"

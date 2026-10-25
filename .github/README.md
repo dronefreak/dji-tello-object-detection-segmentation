@@ -71,17 +71,21 @@ the autonomous-follow demo.
 
 ### Controls
 
-| Action         | Key         |
-| -------------- | ----------- |
-| Takeoff        | Tab         |
-| Land           | Backspace   |
-| Emergency Stop | Esc         |
-| Move           | W/A/S/D     |
-| Up/Down        | Space/Shift |
-| Rotate         | Q/E         |
-| Record Video   | R           |
-| Take Photo     | Enter       |
-| Quit           | P           |
+| Action         | Key       |
+| -------------- | --------- |
+| Takeoff        | Tab       |
+| Land           | Backspace |
+| Emergency Stop | Esc       |
+| Move           | W/A/S/D   |
+| Up/Down        | Space/X   |
+| Rotate         | Q/E       |
+| Record Video   | R         |
+| Take Photo     | Enter     |
+| Quit           | P         |
+
+Keys only work while the video window is focused. **Esc cuts the motors
+immediately and the drone will fall** — use Backspace to land, and P to quit
+(it lands first).
 
 ## Architecture
 

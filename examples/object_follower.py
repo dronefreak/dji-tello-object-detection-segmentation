@@ -11,8 +11,8 @@ This is a starting point for self-driving car concepts applied to drones:
 
 import time
 from collections import deque
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from dataclasses import dataclass, replace
+from typing import Deque, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -31,9 +31,15 @@ ControlVector = Tuple[int, int, int, int]
 # Number of recent target positions to average for jitter smoothing.
 SMOOTHING_WINDOW = 3
 
+# RC command that holds the drone in a hover. The Tello keeps flying at
+# the last RC velocity it received, so this must be sent explicitly
+# whenever the follower has no target to steer towards.
+HOVER: "ControlVector" = (0, 0, 0, 0)
+
 # cv2.waitKey() key codes used for interactive controls.
 KEY_TAB = 9
 KEY_BACKSPACE = 8
+KEY_DELETE = 127  # What the Backspace key sends on macOS
 KEY_ESC = 27
 
 
@@ -143,8 +149,8 @@ class ObjectFollower:
         self.max_area = 50000  # Too close, move back
         self.forward_speed = 20
 
-        # Tracking state
-        self.target_history: deque = deque(maxlen=5)  # Smooth tracking
+        # Tracking state: raw (unsmoothed) centers of recent targets.
+        self.target_history: Deque[Tuple[int, int]] = deque(maxlen=SMOOTHING_WINDOW)
         self.lost_frames = 0
         self.max_lost_frames = 30
 
@@ -206,43 +212,55 @@ class ObjectFollower:
         Update tracking and return control commands.
 
         Returns:
-            (lr, fb, ud, yaw) or None if target lost
+            ((lr, fb, ud, yaw), tracked_target), or (None, None) if the
+            target is lost. tracked_target is a smoothed copy; the
+            detections in ``result`` are never modified.
 
         """
         target = self.find_target(result, frame_shape)
 
         if target:
-            self.target_history.append(target)
+            # Store the raw center: averaging already-smoothed values
+            # would feed back into itself and add lag.
+            self.target_history.append(target.center)
             self.lost_frames = 0
 
             # Use smoothed position to reduce jitter in the control loop.
-            # Average the recent detection centers, then re-center the
+            # Average the recent raw centers, then re-center a copy of the
             # current bbox on that smoothed point (keeping its size).
-            if len(self.target_history) >= SMOOTHING_WINDOW:
-                smoothed_cx, smoothed_cy = np.mean(
-                    [t.center for t in self.target_history], axis=0
-                ).astype(int)
-                x1, y1, x2, y2 = target.bbox
-                half_width, half_height = (x2 - x1) // 2, (y2 - y1) // 2
-                target.bbox = (
+            smoothed_cx, smoothed_cy = np.mean(self.target_history, axis=0).astype(int)
+            x1, y1, x2, y2 = target.bbox
+            half_width, half_height = (x2 - x1) // 2, (y2 - y1) // 2
+            tracked = replace(
+                target,
+                bbox=(
                     int(smoothed_cx - half_width),
                     int(smoothed_cy - half_height),
                     int(smoothed_cx + half_width),
                     int(smoothed_cy + half_height),
-                )
+                ),
+            )
 
-            return self.calculate_control(target, frame_shape), target
+            return self.calculate_control(tracked, frame_shape), tracked
         else:
             self.lost_frames += 1
 
             if self.lost_frames > self.max_lost_frames:
-                self.target_history.clear()
-                # Reset PID state so stale integral/derivative history
-                # doesn't cause a control spike when the target reappears.
-                self.pid_yaw.reset()
-                self.pid_vertical.reset()
+                self.reset()
 
             return None, None
+
+    def reset(self) -> None:
+        """
+        Clear tracking history and PID state.
+
+        Stale integral/derivative history would otherwise cause a control
+        spike, e.g. when the target reappears or auto-follow is enabled
+        after the PIDs have been running on the ground.
+        """
+        self.target_history.clear()
+        self.pid_yaw.reset()
+        self.pid_vertical.reset()
 
 
 def _initialize() -> Tuple[TelloController, BaseDetector, Visualizer, str]:
@@ -289,16 +307,20 @@ def _handle_key(key: int, drone: TelloController, auto_follow: bool) -> tuple:
     """
     if key == KEY_TAB:
         if not auto_follow:
-            drone.takeoff()
-            time.sleep(3)  # Wait for stable hover
-            auto_follow = True
-            print("Auto-follow ENABLED")
-    elif key == KEY_BACKSPACE:
+            if drone.takeoff():
+                time.sleep(3)  # Wait for stable hover
+                auto_follow = True
+                print("Auto-follow ENABLED")
+            else:
+                print("Takeoff failed; auto-follow stays OFF")
+    elif key in (KEY_BACKSPACE, KEY_DELETE):
         if auto_follow:
             auto_follow = False
-            drone.send_rc_control(0, 0, 0, 0)  # Stop movement
-            drone.land()
-            print("Auto-follow DISABLED")
+            drone.send_rc_control(*HOVER)  # Stop movement
+            if drone.land():
+                print("Auto-follow DISABLED")
+            else:
+                print("Auto-follow DISABLED, but landing failed - drone is hovering")
     elif key == KEY_ESC:
         drone.emergency()
         return auto_follow, True
@@ -397,9 +419,10 @@ def main() -> None:
             result = detector.detect(frame)
             control, target = follower.update(result, frame.shape)
 
-            if auto_follow and control:
-                lr, fb, ud, yaw = control
-                drone.send_rc_control(lr, fb, ud, yaw)
+            if auto_follow:
+                # Hover when the target is lost; otherwise the drone keeps
+                # flying at the last velocity it was sent.
+                drone.send_rc_control(*(control or HOVER))
 
             frame = _draw_frame(
                 visualizer,
@@ -410,7 +433,12 @@ def main() -> None:
             cv2.imshow("Object Following", frame)
 
             key = cv2.waitKey(1) & 0xFF
+            was_following = auto_follow
             auto_follow, should_quit = _handle_key(key, drone, auto_follow)
+            if auto_follow and not was_following:
+                # The PIDs have been updating while on the ground; start
+                # following with a clean slate instead of a jolt.
+                follower.reset()
             if should_quit:
                 break
 

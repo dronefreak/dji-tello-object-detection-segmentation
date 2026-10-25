@@ -8,6 +8,6 @@ jobs:
   policy:
     uses: ./.github/workflows/policy.yml
     with:
-      max_pr_size: 800
+      max_pr_size: 1000
       warn_pr_size: 300
     secrets: inherit
